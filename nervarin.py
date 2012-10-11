@@ -180,29 +180,57 @@ servers = {
 }
 
 
+template = """
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Nervarin</title>
+    <!-- Bootstrap -->
+    <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/css/bootstrap-combined.min.css" rel="stylesheet">
+    <!-- <link rel="stylesheet" href="http://averr.in/static/gen/bp_packed.css?1311598113">
+    <link rel="stylesheet" href="http://averr.in/static/gen/packed.css?1304342019"> -->
+  </head>
+  <body>
+    <div style="width: 400px; margin: 6px auto;">
+        {% for name,s in servers %}
+            <div class="well">
+                <h4>{% if s.host %}{{s.host}}{% else %}{{name}}{% endif %} <span class="label">{{s.os}}</span></h4>
+                <strong>IP:</strong> {{s.ip}} <br />
+                {% if s.os=="linux" %}<strong>SSH:</strong> ssh {{s.ssh_user}}{% if s.ssh_password %}:{{s.ssh_password}}{% endif %}@{% if s.host %}{{s.host}}{% else %}{{s.ip}}{% endif %} -p {{s.ssh_port}} <br />{% endif %}
+                {% if s.os=="linux" %}<strong>FTP port:</strong> {{s.ftp_port}} <br />{% endif %}
+                {% if s.other_hosts %}<strong>other_hosts:</strong> {{s.other_hosts|join(', ')}} <br />{% endif %}
+                <strong>Tags:</strong> {% for tag in s.tags %}<span class="label label-success">{{tag}}</span> {% endfor %}
+            </div>
+        {% endfor %}
+    </div>
+    <script src="http://code.jquery.com/jquery-latest.js"></script>
+    <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/js/bootstrap.min.js"></script>
+  </body>
+</html>
+"""
+
+
+from bottle import route, run
+
+
 class ServerList(dict):
-    servers = servers
-    certs = certs
-
     def __init__(self):
-        cls = type(self)
-        self.update(cls.servers)
-        cls.by_tags = partial(cls.by_attrs, 'tags')
-        cls.by_projects = partial(cls.by_attrs, 'projects')
-        cls.by_hosts = partial(cls.by_attrs, 'other_hosts')
+        self.update(servers)
+        self.certs = certs
+        self.by_tags = partial(self.by_attrs, 'tags')
+        self.by_projects = partial(self.by_attrs, 'projects')
+        self.by_hosts = partial(self.by_attrs, 'other_hosts')
 
-    @classmethod
-    def by_attrs(cls, key, *values):
+    def by_attrs(self, key, *values):
         res = []
-        for s in cls.servers.values():
+        for s in self.values():
             if len(set(values).intersection(s[key])) == len(values):
                 res.append(s)
         return res
 
-    @classmethod
-    def by_attr(cls, key, value):
+    def by_attr(self, key, value):
         res = []
-        for s in cls.servers.values():
+        for s in self.values():
             if s[key] == value:
                 res.append(s)
         return res
@@ -212,3 +240,16 @@ class ServerList(dict):
         return cls.certs[key]
 
 SERVERS = ServerList()
+
+
+@route('/')
+def dump():
+    from jinja2 import Template
+    return Template(template).render(servers=SERVERS.iteritems(), certs=SERVERS.certs)
+
+
+def serve():
+    run(host='0.0.0.0', port=8080, reloader=True)
+
+if __name__ == "__main__":
+    serve()
