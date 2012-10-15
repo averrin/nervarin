@@ -1,5 +1,43 @@
 # -*- coding: utf-8 -*-
 from functools import partial
+from fabric.api import run, env, local, cd, prompt, lcd, open_shell, get, put
+from bottle import route, run, request, HTTPError
+import os
+
+
+# CONFIG
+PORT = 8080
+
+TEMPLATE = """
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Nervarin</title>
+    <!-- Bootstrap -->
+    <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/css/bootstrap-combined.min.css" rel="stylesheet">
+    <!-- <link rel="stylesheet" href="http://averr.in/static/gen/bp_packed.css?1311598113">
+    <link rel="stylesheet" href="http://averr.in/static/gen/packed.css?1304342019"> -->
+  </head>
+  <body>
+    <div style="width: 400px; margin: 6px auto;">
+        {% for name,s in servers %}
+            <div class="well">
+                <h4>{% if s.host %}{{s.host}}{% else %}{{name}}{% endif %} <span class="label">{{s.os}}</span></h4>
+                <strong>IP:</strong> {{s.ip}} <br />
+                {% if s.os=="linux" %}<strong>SSH:</strong> ssh {{s.ssh_user}}{% if s.ssh_password %}:{{s.ssh_password}}{% endif %}@{% if s.host %}{{s.host}}{% else %}{{s.ip}}{% endif %} -p {{s.ssh_port}} <br />{% endif %}
+                {% if s.os=="linux" %}<strong>FTP port:</strong> {{s.ftp_port}} <br />{% endif %}
+                {% if s.other_hosts %}<strong>other_hosts:</strong> {{s.other_hosts|join(', ')}} <br />{% endif %}
+                <strong>Tags:</strong> {% for tag in s.tags %}<span class="label label-success">{{tag}}</span> {% endfor %} <br />
+                {% if s.}
+            </div>
+        {% endfor %}
+    </div>
+    <script src="http://code.jquery.com/jquery-latest.js"></script>
+    <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/js/bootstrap.min.js"></script>
+  </body>
+</html>
+"""
+# ENDCONFIG
 
 
 certs = {'aws_ssh_averrin': """-----BEGIN RSA PRIVATE KEY-----
@@ -116,7 +154,7 @@ servers = {
         }
     },
     'moscow_win': {
-        'ip': '10.137.190.62',
+        'ip': '10.137.191.87',
         'os': 'windows',
         'host': '',
         'other_hosts': [],
@@ -125,8 +163,8 @@ servers = {
         'ftp_port': 21,
         'description': 'Moscow server windows (Emercom 2.0)',
         "keys": {
-            'rdp_user': 'administartor',
-            'rdp_password': 'vjrhtvt17'
+            'rdp_user': 'Administartor',
+            'rdp_password': '1'
         }
     },
 
@@ -135,7 +173,7 @@ servers = {
         'ip': '62.76.40.97',
         'os': 'linux',
         'host': 'averr.in',
-        'other_hosts': ['me.averr.in'],
+        'other_hosts': ['me.averr.in', 'files.averr.in'],
         'tags': ['private'],
         'projects': ['eliar'],
         'ssh_port': 22,
@@ -180,39 +218,7 @@ servers = {
 }
 
 
-template = """
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Nervarin</title>
-    <!-- Bootstrap -->
-    <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/css/bootstrap-combined.min.css" rel="stylesheet">
-    <!-- <link rel="stylesheet" href="http://averr.in/static/gen/bp_packed.css?1311598113">
-    <link rel="stylesheet" href="http://averr.in/static/gen/packed.css?1304342019"> -->
-  </head>
-  <body>
-    <div style="width: 400px; margin: 6px auto;">
-        {% for name,s in servers %}
-            <div class="well">
-                <h4>{% if s.host %}{{s.host}}{% else %}{{name}}{% endif %} <span class="label">{{s.os}}</span></h4>
-                <strong>IP:</strong> {{s.ip}} <br />
-                {% if s.os=="linux" %}<strong>SSH:</strong> ssh {{s.ssh_user}}{% if s.ssh_password %}:{{s.ssh_password}}{% endif %}@{% if s.host %}{{s.host}}{% else %}{{s.ip}}{% endif %} -p {{s.ssh_port}} <br />{% endif %}
-                {% if s.os=="linux" %}<strong>FTP port:</strong> {{s.ftp_port}} <br />{% endif %}
-                {% if s.other_hosts %}<strong>other_hosts:</strong> {{s.other_hosts|join(', ')}} <br />{% endif %}
-                <strong>Tags:</strong> {% for tag in s.tags %}<span class="label label-success">{{tag}}</span> {% endfor %}
-            </div>
-        {% endfor %}
-    </div>
-    <script src="http://code.jquery.com/jquery-latest.js"></script>
-    <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/js/bootstrap.min.js"></script>
-  </body>
-</html>
-"""
-
-
-from bottle import route, run
-
-
+# SERVERS LOGIC
 class ServerList(dict):
     def __init__(self):
         self.update(servers)
@@ -240,16 +246,44 @@ class ServerList(dict):
         return cls.certs[key]
 
 SERVERS = ServerList()
+for s in SERVERS.by_attr('os', 'linux'):
+    env.passwords['%(ssh_user)s@%(ip)s' % s] = s['ssh_password']
+    env.passwords['%(ssh_user)s@%(host)s' % s] = s['ssh_password']
+    for h in s['other_hosts']:
+        env.passwords['%s@%s' % (s['ssh_user'], h)] = s['ssh_password']
+
+env.key_filename = []
+os.mkdir('.temp')
+for cert in certs:
+    f = file('.temp/' + cert, 'w')
+    f.write(certs[cert])
+    f.close()
+    env.key_filename.append('.temp/' + cert)
 
 
+
+# SERVE LOGIC
 @route('/')
 def dump():
+    if not 'aqwersdf' in request.GET:
+        raise HTTPError(404, "These are not the droids you're looking for")
     from jinja2 import Template
-    return Template(template).render(servers=SERVERS.iteritems(), certs=SERVERS.certs)
+    return Template(TEMPLATE).render(servers=SERVERS.iteritems(), certs=SERVERS.certs)
 
 
 def serve():
-    run(host='0.0.0.0', port=8080, reloader=True)
+    run(host='0.0.0.0', port=PORT, reloader=True)
 
+
+# FABRIC LOGIC
+def shell():
+    open_shell()
+
+
+def send_file(local, remote):
+    put(local, remote)
+
+
+# ETC
 if __name__ == "__main__":
     serve()
