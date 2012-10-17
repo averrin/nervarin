@@ -24,7 +24,7 @@ servers = {
     },
     'note': {
         'ip': '10.137.190.141',
-        'os': 'linux',
+        'os': 'linux_',
         'host': '',
         'other_hosts': [],
         'tags': ['work', 'spb'],
@@ -156,7 +156,7 @@ except ImportError:
 # CONFIG
 PORT = 8080
 ssh_startup = 'tmux new-session -t default || tmux new-session -s default'
-packages = ['tmux', 'zsh', 'curl', 'w3m', 'autojump']
+packages = ['tmux', 'zsh', 'curl', 'w3m', 'autojump', 'vim']
 
 TEMPLATE = """
 <!DOCTYPE html>
@@ -189,7 +189,7 @@ TEMPLATE = """
 """
 
 tmux_conf = """
-set-option -g default-shell "zsh"
+set-option -g default-shell "/usr/bin/zsh"
 unbind C-b
 unbind l
 set -g prefix C-a
@@ -236,6 +236,7 @@ plugins=(git)
 source $ZSH/oh-my-zsh.sh
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games
 #source /usr/share/autojump/autojump.sh
+PS1="(%{$fg[cyan]%}{server}%{$reset_color%}) $PS1"
 """
 
 # ENDCONFIG
@@ -354,12 +355,14 @@ SERVERS = ServerList()
 for s in SERVERS:
     SERVERS[s]['alias'] = s
 
+env.roledefs['linux'] = []
 for s in SERVERS.by_attr('os', 'linux'):
     env.passwords['%(ssh_user)s@%(ip)s:%(ssh_port)s' % s] = s['ssh_password']
     env.passwords['%(ssh_user)s@%(host)s:%(ssh_port)s' % s] = s['ssh_password']
     for h in s['other_hosts']:
         env.passwords['%s@%s:%s' % (s['ssh_user'], h, s['ssh_port'])] = s['ssh_password']
     env.roledefs[s['alias']] = ['%(ssh_user)s@%(ip)s:%(ssh_port)s' % s]
+    env.roledefs['linux'].append('%(ssh_user)s@%(ip)s:%(ssh_port)s' % s)
 
 env.key_filename = []
 clean()
@@ -398,10 +401,8 @@ def shell(native=False, tmux=True):
     """
         Open common ssh shell
     """
-    # if not eval(str(tmux)):
-    #     ssh_startup = ''
     if native or eval(str(native)):
-        open_shell(ssh_startup)
+        open_shell(ssh_startup if eval(str(tmux)) else '')
     else:
         key = current()['ssh_cert']
         password = SERVERS.by_attr('ip', env['host_string'].split('@')[1].split(':')[0])[0]['ssh_password']
@@ -411,7 +412,7 @@ def shell(native=False, tmux=True):
             env['host_string'].split(':')[0],
             env['host_string'].split(':')[1],
             key,
-            ssh_startup)
+            ssh_startup if eval(str(tmux)) else '')
         os.system(ssh)
         print ssh
     clean()
@@ -446,8 +447,8 @@ def init(pm='apt-get'):
     run('curl -L https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh | sh')
     env.warn_only = False
     put(dump_to_file('.tmux.conf', tmux_conf), '.')
-    put(dump_to_file('.zshrc', zshrc), '.')
-    clean()
+    put(dump_to_file('.zshrc', zshrc.replace('{server}', current()['alias'])), '.')
+    # clean()
 
 
 @task
