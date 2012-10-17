@@ -1,12 +1,162 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from functools import partial
-from fabric.api import run, env, local, cd, prompt, lcd, open_shell, get, put
-from bottle import route, run, request, HTTPError
-import os
+
+# SERVERS DEFS
+servers = {
+    'dev': {
+        'ip': '10.137.190.6',
+        'os': 'linux',
+        'host': 's4.lcs.local',
+        'other_hosts': [
+            'dev.lcs.local',
+            'gitlab.lcs.local',
+            'emercom.lcs.local',
+            'sentry.lcs.local'
+        ],
+        'tags': ['work', 'spb'],
+        'projects': ['dev', 'emercom', 'api'],
+        'ssh_port': 22,
+        'ssh_user': 'nabrodov',
+        'ssh_password': 'aqwersdf',
+        'ssh_cert': '',
+        'ftp_port': 21,
+        'description': 'Work dev server',
+    },
+    'note': {
+        'ip': '10.137.190.141',
+        'os': 'linux',
+        'host': '',
+        'other_hosts': [],
+        'tags': ['work', 'spb'],
+        'projects': ['dev', 'emercom', 'api'],
+        'ssh_port': 22,
+        'ssh_user': 'nabrodov',
+        'ssh_password': 'aqwersdf',
+        'ssh_cert': '',
+        'ftp_port': 21,
+        'description': 'Work demo server'
+    },
+
+    'moscow_linux': {
+        'ip': '10.137.191.77',
+        'os': 'linux',
+        'host': '',
+        'other_hosts': [],
+        'tags': ['work', 'moscow'],
+        'projects': ['dev', 'emercom', 'api'],
+        'ssh_port': 22,
+        'ssh_user': 'root',
+        'ssh_password': 'vjrhtvt17',
+        'ssh_cert': '',
+        'ftp_port': 21,
+        'description': 'Moscow server linux (Emercom 2.0)',
+        'keys': {
+            'oracle_user': 'service2',
+            'oracle_pass': 'gwlxTjK'
+        }
+    },
+    'rtrs_win': {
+        'ip': '192.168.165.19',
+        'os': 'windows',
+        'host': '',
+        'other_hosts': [],
+        'tags': ['work', 'moscow'],
+        'projects': [],
+        'ftp_port': 21,
+        'description': 'Moscow server windows (Emercom 2.0)',
+        "keys": {
+            'rdp_user': 'Administartor',
+            'rdp_password': '1'
+        }
+    },
+
+    'rtrs_linux': {
+        'ip': '192.168.165.22',
+        'os': 'linux',
+        'host': '',
+        'other_hosts': [],
+        'tags': ['work', 'moscow'],
+        'projects': ['dev', 'emercom', 'api'],
+        'ssh_port': 22,
+        'ssh_user': 'admins',
+        'ssh_password': 'Crypto123',
+        'ssh_cert': '',
+        'ftp_port': 21,
+        'description': 'Moscow server linux (Emercom 2.0)',
+        'keys': {
+            'oracle_user': 'service2',
+            'oracle_pass': 'gwlxTjK'
+        }
+    },
+
+
+    'clodo': {
+        'ip': '62.76.40.97',
+        'os': 'linux',
+        'host': 'averr.in',
+        'other_hosts': ['me.averr.in', 'files.averr.in'],
+        'tags': ['private'],
+        'projects': ['eliar'],
+        'ssh_port': 22,
+        'ssh_user': 'averrin',
+        'ssh_password': 'aqwersdf',
+        'ssh_cert': '',
+        'ftp_port': 21,
+        'description': 'Clodo private server'
+    },
+    'home': {
+        'ip': '109.230.153.135',
+        'os': 'linux',
+        'host': 'home.averr.in',
+        'other_hosts': [],
+        'tags': ['private'],
+        'projects': [],
+        'ssh_port': 8822,
+        'ssh_user': 'averrin',
+        'ssh_password': 'aqwersdf',
+        'ssh_cert': '',
+        'ftp_port': 8821,
+        'description': 'Home media server (Stora)'
+    },
+    'aws': {
+        'ip': '107.22.234.119',
+        'os': 'linux',
+        'host': 'aws.averr.in',
+        'other_hosts': [],
+        'tags': ['private', 'aws'],
+        'projects': ['evernight'],
+        'ssh_port': 22,
+        'ssh_user': 'averrin',
+        'ssh_password': '',
+        'ssh_cert': 'aws_ssh_averrin',
+        'ftp_port': 21,
+        'description': 'Amazon cloud server',
+        "keys": {
+            "aws_id": 'AKIAIQ4CB4POAICCQVIA',
+            "aws_key": 'SbTGinDN+P5n0IIGmvc4CwVzZFb2IojtG9Q9dF+O'
+        }
+    }
+}
+
+#MODULES
+
+try:
+    from functools import partial
+    from fabric.api import run, env, open_shell, put, sudo, get, prompt, puts
+    from fabric.colors import red
+    from fabric.decorators import task
+    import os
+    import shutil
+except ImportError:
+    print 'Plz install deps:'
+    print '>\tsudo pip install fabric bottle boto'
+    exit(1)
 
 
 # CONFIG
 PORT = 8080
+ssh_startup = 'tmux new-session -t default || tmux new-session -s default'
+packages = ['tmux', 'zsh', 'curl', 'w3m', 'autojump']
 
 TEMPLATE = """
 <!DOCTYPE html>
@@ -37,6 +187,57 @@ TEMPLATE = """
   </body>
 </html>
 """
+
+tmux_conf = """
+set-option -g default-shell "zsh"
+unbind C-b
+unbind l
+set -g prefix C-a
+bind-key C-a last-window
+set-option -g mouse-select-pane on
+unbind %
+bind | split-window -h
+bind - split-window -v
+bind % killp
+bind a displayp \; lsp
+bind h neww htop
+bind r source-file ~/.tmux.conf
+set -g default-terminal "screen-256color"
+set -g history-limit 1000
+set-window-option -g mode-keys vi # vi key
+set-option -g status-keys vi
+set-window-option -g utf8 on
+set-window-option -g mode-mouse off
+set-option -g base-index 1
+set-option -g status-utf8 on
+set-option -g status-justify right
+set-option -g status-bg black
+set-option -g status-fg white
+set-option -g status-interval 5
+set-option -g status-left-length 30
+set-option -g status-left '#[fg=red,bold]» #[fg=blue,bold]#T#[default]'
+set-option -g status-right '#[fg=white,bold]»» #[fg=blue,bold]###S #[fg=red]%R %d.%m#(acpi | cut -d ',' -f 2)#[default]'
+set-option -g visual-activity on
+set-window-option -g monitor-activity on
+set-window-option -g window-status-current-fg white
+set-window-option -g window-status-current-bg default
+set-window-option -g window-status-current-attr bold
+set-window-option -g clock-mode-colour cyan
+set-window-option -g clock-mode-style 24
+set-window-option -g window-status-fg white
+set-window-option -g window-status-attr dim
+set -g default-terminal screen-256color
+"""
+
+zshrc = """
+ZSH=$HOME/.oh-my-zsh
+ZSH_THEME="sorin"
+plugins=(git)
+source $ZSH/oh-my-zsh.sh
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games
+#source /usr/share/autojump/autojump.sh
+"""
+
 # ENDCONFIG
 
 
@@ -100,124 +301,6 @@ vuo3RSTtBCQeyEIg95omvbq8zvyWKgiFsTg9+dRcNrutfaawuEqVx6tfvjCs7pS7
 }
 
 
-servers = {
-    'dev': {
-        'ip': '10.137.190.6',
-        'os': 'linux',
-        'host': 's4.lcs.local',
-        'other_hosts': [
-            'dev.lcs.local',
-            'gitlab.lcs.local',
-            'emercom.lcs.local',
-            'sentry.lcs.local'
-        ],
-        'tags': ['work', 'spb'],
-        'projects': ['dev', 'emercom', 'api'],
-        'ssh_port': 22,
-        'ssh_user': 'nabrodov',
-        'ssh_password': 'aqwersdf',
-        'ssh_cert': '',
-        'ftp_port': 21,
-        'description': 'Work dev server',
-    },
-    'note': {
-        'ip': '10.137.190.141',
-        'os': 'linux',
-        'host': '',
-        'other_hosts': [],
-        'tags': ['work', 'spb'],
-        'projects': ['dev', 'emercom', 'api'],
-        'ssh_port': 22,
-        'ssh_user': 'nabrodov',
-        'ssh_password': 'aqwersdf',
-        'ssh_cert': '',
-        'ftp_port': 21,
-        'description': 'Work demo server'
-    },
-
-    'moscow_linux': {
-        'ip': '10.137.190.77',
-        'os': 'linux',
-        'host': '',
-        'other_hosts': [],
-        'tags': ['work', 'moscow'],
-        'projects': ['dev', 'emercom', 'api'],
-        'ssh_port': 22,
-        'ssh_user': 'root',
-        'ssh_password': 'vjrhtvt17',
-        'ssh_cert': '',
-        'ftp_port': 21,
-        'description': 'Moscow server linux (Emercom 2.0)',
-        'keys': {
-            'oracle_user': 'service2',
-            'oracle_pass': 'gwlxTjK'
-        }
-    },
-    'moscow_win': {
-        'ip': '10.137.191.87',
-        'os': 'windows',
-        'host': '',
-        'other_hosts': [],
-        'tags': ['work', 'moscow'],
-        'projects': [],
-        'ftp_port': 21,
-        'description': 'Moscow server windows (Emercom 2.0)',
-        "keys": {
-            'rdp_user': 'Administartor',
-            'rdp_password': '1'
-        }
-    },
-
-
-    'clodo': {
-        'ip': '62.76.40.97',
-        'os': 'linux',
-        'host': 'averr.in',
-        'other_hosts': ['me.averr.in', 'files.averr.in'],
-        'tags': ['private'],
-        'projects': ['eliar'],
-        'ssh_port': 22,
-        'ssh_user': 'averrin',
-        'ssh_password': 'aqwersdf',
-        'ssh_cert': '',
-        'ftp_port': 21,
-        'description': 'Clodo private server'
-    },
-    'home': {
-        'ip': '109.230.153.135',
-        'os': 'linux',
-        'host': 'home.averr.in',
-        'other_hosts': [],
-        'tags': ['private'],
-        'projects': [],
-        'ssh_port': 8822,
-        'ssh_user': 'averrin',
-        'ssh_password': 'aqwersdf',
-        'ssh_cert': '',
-        'ftp_port': 8821,
-        'description': 'Home media server (Stora)'
-    },
-    'aws': {
-        'ip': '107.22.234.119',
-        'os': 'linux',
-        'host': 'aws.averr.in',
-        'other_hosts': [],
-        'tags': ['private', 'aws'],
-        'projects': ['evernight'],
-        'ssh_port': 22,
-        'ssh_user': 'averrin',
-        'ssh_password': '',
-        'ssh_cert': 'aws_ssh_averrin',
-        'ftp_port': 21,
-        'description': 'Amazon cloud server',
-        "keys": {
-            "aws_id": 'AKIAIQ4CB4POAICCQVIA',
-            "aws_key": 'SbTGinDN+P5n0IIGmvc4CwVzZFb2IojtG9Q9dF+O'
-        }
-    }
-}
-
-
 # SERVERS LOGIC
 class ServerList(dict):
     def __init__(self):
@@ -245,45 +328,135 @@ class ServerList(dict):
     def getCert(cls, key):
         return cls.certs[key]
 
+
+# ETC
+def dump_to_file(filename, text):
+    with file('.temp/' + filename, 'w') as f:
+        f.write(text)
+    return '.temp/' + filename
+
+
+@task
+def clean():
+    """
+        Clean temp files
+    """
+    if os.path.isdir('.temp'):
+        shutil.rmtree('.temp')
+
+
+def current():
+    return SERVERS.by_attr('ip', env['host_string'].split('@')[1].split(':')[0])[0]
+
+
 SERVERS = ServerList()
+
+for s in SERVERS:
+    SERVERS[s]['alias'] = s
+
 for s in SERVERS.by_attr('os', 'linux'):
-    env.passwords['%(ssh_user)s@%(ip)s' % s] = s['ssh_password']
-    env.passwords['%(ssh_user)s@%(host)s' % s] = s['ssh_password']
+    env.passwords['%(ssh_user)s@%(ip)s:%(ssh_port)s' % s] = s['ssh_password']
+    env.passwords['%(ssh_user)s@%(host)s:%(ssh_port)s' % s] = s['ssh_password']
     for h in s['other_hosts']:
-        env.passwords['%s@%s' % (s['ssh_user'], h)] = s['ssh_password']
+        env.passwords['%s@%s:%s' % (s['ssh_user'], h, s['ssh_port'])] = s['ssh_password']
+    env.roledefs[s['alias']] = ['%(ssh_user)s@%(ip)s:%(ssh_port)s' % s]
 
 env.key_filename = []
+clean()
 os.mkdir('.temp')
 for cert in certs:
-    f = file('.temp/' + cert, 'w')
-    f.write(certs[cert])
-    f.close()
-    env.key_filename.append('.temp/' + cert)
-
+    env.key_filename.append(dump_to_file(cert, certs[cert]))
 
 
 # SERVE LOGIC
-@route('/')
-def dump():
-    if not 'aqwersdf' in request.GET:
-        raise HTTPError(404, "These are not the droids you're looking for")
+
+try:
+    from bottle import route, request, HTTPError
+    from bottle import run as server_run
     from jinja2 import Template
-    return Template(TEMPLATE).render(servers=SERVERS.iteritems(), certs=SERVERS.certs)
 
+    @route('/')
+    def dump():
+        if not 'aqwersdf' in request.GET:
+            raise HTTPError(404, "These are not the droids you're looking for")
+        return Template(TEMPLATE).render(servers=SERVERS.iteritems(), certs=SERVERS.certs)
 
-def serve():
-    run(host='0.0.0.0', port=PORT, reloader=True)
+    @task
+    def serve():
+        """
+            Run web-server for html version of servers list
+        """
+        server_run(host='0.0.0.0', port=PORT, reloader=True)
+
+except:
+    print red('Serve not supported. Need Bottle and Jinja2')
 
 
 # FABRIC LOGIC
-def shell():
-    open_shell()
+@task
+def shell(native=False, tmux=True):
+    """
+        Open common ssh shell
+    """
+    # if not eval(str(tmux)):
+    #     ssh_startup = ''
+    if native or eval(str(native)):
+        open_shell(ssh_startup)
+    else:
+        key = current()['ssh_cert']
+        password = SERVERS.by_attr('ip', env['host_string'].split('@')[1].split(':')[0])[0]['ssh_password']
+        if key:
+            key = '-i .temp/' + key
+        ssh = "sshpass -p '%s' ssh %s -p %s %s -t '%s'" % (password,
+            env['host_string'].split(':')[0],
+            env['host_string'].split(':')[1],
+            key,
+            ssh_startup)
+        os.system(ssh)
+        print ssh
+    clean()
 
 
+@task
 def send_file(local, remote):
+    """
+        Send file by scp
+    """
     put(local, remote)
+    clean()
 
 
-# ETC
+@task
+def get_file(remote, local):
+    """
+        Send file by scp
+    """
+    get(remote, local)
+    clean()
+
+
+@task
+def init(pm='apt-get'):
+    """
+        Install must-have tools like tmux, zsh and others
+    """
+    env.warn_only = True
+    for p in packages:
+        sudo('%s install %s -ym --force-yes' % (pm, p))
+    run('curl -L https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh | sh')
+    env.warn_only = False
+    put(dump_to_file('.tmux.conf', tmux_conf), '.')
+    put(dump_to_file('.zshrc', zshrc), '.')
+    clean()
+
+
+@task
+def get_info():
+    from pprint import pprint
+    pprint(current())
+    run('lsb_release -a', shell=False)
+    run('uname -a', shell=False)
+    clean()
+
 if __name__ == "__main__":
-    serve()
+    os.system('ipython --quick -c "import nervarin as n" -i')
