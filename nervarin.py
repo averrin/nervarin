@@ -157,6 +157,7 @@ except ImportError:
 PORT = 8080
 ssh_startup = 'tmux new-session -t default || tmux new-session -s default'
 packages = ['tmux', 'zsh', 'curl', 'w3m', 'autojump', 'vim']
+pm_args = {'apt-get': '-ym --force-yes', 'yum': '-y'}
 
 TEMPLATE = """
 <!DOCTYPE html>
@@ -189,7 +190,7 @@ TEMPLATE = """
 """
 
 tmux_conf = """
-set-option -g default-shell "/usr/bin/zsh"
+set-option -g default-shell "{shell}"
 unbind C-b
 unbind l
 set -g prefix C-a
@@ -331,9 +332,10 @@ class ServerList(dict):
 
 
 # ETC
-def dump_to_file(filename, text):
+def dump_to_file(filename, text, mod=777):
     with file('.temp/' + filename, 'w') as f:
         f.write(text)
+        os.system('chmod %s %s' % (mod, '.temp/' + filename))
     return '.temp/' + filename
 
 
@@ -368,7 +370,7 @@ env.key_filename = []
 clean()
 os.mkdir('.temp')
 for cert in certs:
-    env.key_filename.append(dump_to_file(cert, certs[cert]))
+    env.key_filename.append(dump_to_file(cert, certs[cert], 400))
 
 
 # SERVE LOGIC
@@ -443,10 +445,11 @@ def init(pm='apt-get'):
     """
     env.warn_only = True
     for p in packages:
-        sudo('%s install %s -ym --force-yes' % (pm, p))
+        sudo('%s install %s %s' % (pm, p, pm_args[pm]))
     run('curl -L https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh | sh')
     env.warn_only = False
-    put(dump_to_file('.tmux.conf', tmux_conf), '.')
+    path = run('which zsh')
+    put(dump_to_file('.tmux.conf', tmux_conf.replace('{shell}', path)), '.')
     put(dump_to_file('.zshrc', zshrc.replace('{server}', current()['alias'])), '.')
     # clean()
 
