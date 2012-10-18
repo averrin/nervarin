@@ -89,7 +89,8 @@
         "ssh_password": "aqwersdf", 
         "ssh_cert": "", 
         "os": "linux", 
-        "pm": "yum"
+        "pm": "yum",
+        "pip": "pip-python"
     }, 
     "moscow_linux": {
         "description": "Moscow server linux (Emercom 2.0)", 

@@ -5,8 +5,10 @@
 
 try:
     from functools import partial
-    from fabric.api import run, env, open_shell, put, sudo, get, prompt, puts
-    from fabric.colors import red
+    from fabric.api import run, env, open_shell, put, sudo
+    from fabric.api import get as scp_get
+    # from fabric.api import puts as fabprint
+    from fabric.colors import red, green, cyan, yellow
     from fabric.decorators import task
     from fabric.tasks import execute
     import os
@@ -25,7 +27,7 @@ ssh_startup = 'tmux new-session -t default || tmux new-session -s default'
 packages = ['tmux', 'zsh', 'curl', 'w3m', 'autojump', 'vim']
 pm_args = {'apt-get': '-ym --force-yes', 'yum': '-y'}
 
-central_server = 'averrin@aws.averr.in:22'
+central_server = '-i .temp/aws_ssh_averrin averrin@aws.averr.in'
 new_server = {
         "description": "",
         "tags": [],
@@ -207,15 +209,19 @@ def backup_json():
     """
         Backup servers on central server
     """
+    print cyan('> Servers sending to remote server')
     put('servers.json', '.')
+    print green('>\tServers saved on %s' % current()['alias'])
 
 
 @task
 def update_json():
     """
-    Update servers from central server
+    Update servers from remote server
     """
-    get('servers.json', '.')
+    print cyan('> Servers getting from remote server')
+    scp_get('servers.json', '.')
+    print green('>\tServers got from remote server')
 
 
 class ServerList(dict):
@@ -225,6 +231,7 @@ class ServerList(dict):
         self.by_tags = partial(self.by_attrs, 'tags')
         self.by_projects = partial(self.by_attrs, 'projects')
         self.by_hosts = partial(self.by_attrs, 'other_hosts')
+        print green('>\tServers loaded')
 
     def by_attrs(self, key, *values):
         res = []
@@ -244,16 +251,20 @@ class ServerList(dict):
     def getCert(cls, key):
         return cls.certs[key]
 
-    def dump(self):
+    def save(self):
         with file('servers.json', 'w') as f:
             f.write(json.dumps(self, indent=4))
 
     def load(self):
         if os.path.isfile('servers.json'):
+            print cyan('> Local servers.json existed')
             with file('servers.json', 'r') as f:
                 self.update(json.loads(f.read()))
         else:
-            execute(update_json, hosts=[central_server])
+            print yellow('> No local servers.json')
+            # execute(update_json, hosts=[central_server])
+            # update_json()
+            os.system('scp %s:servers.json .' % central_server)
             self.load()
 
 
@@ -285,6 +296,7 @@ os.mkdir('.temp')
 for cert in certs:
     env.key_filename.append(dump_to_file(cert, certs[cert], 400))
 
+# file('servers.json', 'w').write('{}')
 SERVERS = ServerList()
 
 for s in SERVERS:
@@ -370,21 +382,27 @@ def get_file(remote, local):
     """
         Send file by scp
     """
-    get(remote, local)
+    scp_get(remote, local)
     # clean()
 
 
 @task
-def init(pm='apt-get'):
+def install(package):
+    """
+        Install package
+    """
+    pm = current().get('pm', 'apt-get')
+    sudo('%s install %s %s' % (pm, package, pm_args[pm]))
+
+
+@task
+def init():
     """
         Install must-have tools like tmux, zsh and others
     """
     env.warn_only = True
-    s = current()
-    if not 'pm' in s:
-        s['pm'] = pm
     for p in packages:
-        sudo('%s install %s %s' % (s['pm'], p, pm_args[s['pm']]))
+        install(p)
     run('curl -L https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh | sh')
     env.warn_only = False
     path = run('which zsh')
@@ -410,13 +428,26 @@ def full_backup():
     """
         Backup servers and this file on central server
     """
+    print cyan('> Performing full backup')
     backup_json()
+    print cyan('> Nervarin sending to remote server')
     put(env['fabfile'], '.')
+    print green('>\tNervarin saved on %s' % current()['alias'])
+
+
+@task
+def pip(package):
+    """
+        Install python package
+    """
+    p = current().get('pip', 'pip')
+    sudo('%s install %s' % (p, package))
 
 
 @task
 def test():
     print env
+
 
 if __name__ == "__main__":
     os.system('ipython --quick -c "import nervarin as n" -i')
