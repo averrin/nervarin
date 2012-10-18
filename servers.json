@@ -1,0 +1,222 @@
+{
+    "clodo": {
+        "description": "Clodo private server", 
+        "tags": [
+            "private"
+        ], 
+        "ssh_port": 22, 
+        "ip": "62.76.40.97", 
+        "host": "averr.in", 
+        "groups": [
+            "ssh", 
+            "normal", 
+            "private", 
+            "active"
+        ], 
+        "projects": [
+            "eliar"
+        ], 
+        "ftp_port": 21, 
+        "other_hosts": [
+            "me.averr.in", 
+            "files.averr.in"
+        ], 
+        "alias": "clodo", 
+        "ssh_user": "averrin", 
+        "ssh_password": "aqwersdf", 
+        "ssh_cert": "", 
+        "os": "linux"
+    }, 
+    "aws": {
+        "description": "Amazon cloud server", 
+        "tags": [
+            "private", 
+            "aws"
+        ], 
+        "ssh_port": 22, 
+        "ip": "107.22.234.119", 
+        "host": "aws.averr.in", 
+        "attrs": {
+            "aws_key": "SbTGinDN+P5n0IIGmvc4CwVzZFb2IojtG9Q9dF+O", 
+            "aws_id": "AKIAIQ4CB4POAICCQVIA"
+        }, 
+        "groups": [
+            "ssh", 
+            "normal", 
+            "private", 
+            "active",
+	    "aws"
+        ], 
+        "projects": [
+            "evernight"
+        ], 
+        "ftp_port": 21, 
+        "other_hosts": [], 
+        "alias": "aws", 
+        "ssh_user": "averrin", 
+        "ssh_password": "", 
+        "ssh_cert": "aws_ssh_averrin", 
+        "os": "linux"
+    }, 
+    "dev": {
+        "description": "Work dev server", 
+        "tags": [
+            "work", 
+            "spb"
+        ], 
+        "ssh_port": 22, 
+        "ip": "10.137.190.6", 
+        "host": "s4.lcs.local", 
+        "groups": [
+            "ssh", 
+            "normal", 
+            "active"
+        ], 
+        "projects": [
+            "dev", 
+            "emercom", 
+            "api"
+        ], 
+        "ftp_port": 21, 
+        "other_hosts": [
+            "dev.lcs.local", 
+            "gitlab.lcs.local", 
+            "emercom.lcs.local", 
+            "sentry.lcs.local"
+        ], 
+        "alias": "dev", 
+        "ssh_user": "nabrodov", 
+        "ssh_password": "aqwersdf", 
+        "ssh_cert": "", 
+        "os": "linux", 
+        "pm": "yum"
+    }, 
+    "moscow_linux": {
+        "description": "Moscow server linux (Emercom 2.0)", 
+        "tags": [
+            "work", 
+            "moscow"
+        ], 
+        "ssh_port": 22, 
+        "ip": "10.137.191.77", 
+        "host": "", 
+        "attrs": {
+            "oracle_pass": "gwlxTjK", 
+            "oracle_user": "service2"
+        }, 
+        "groups": [
+            "ssh", 
+            "normal"
+        ], 
+        "projects": [
+            "dev", 
+            "emercom", 
+            "api"
+        ], 
+        "ftp_port": 21, 
+        "other_hosts": [], 
+        "alias": "moscow_linux", 
+        "ssh_user": "root", 
+        "ssh_password": "vjrhtvt17", 
+        "ssh_cert": "", 
+        "os": "linux"
+    }, 
+    "note": {
+        "description": "Work demo server", 
+        "tags": [
+            "work", 
+            "spb"
+        ], 
+        "ssh_port": 22, 
+        "ip": "10.137.190.141", 
+        "host": "", 
+        "groups": [
+            "ssh"
+        ], 
+        "projects": [
+            "dev", 
+            "emercom", 
+            "api"
+        ], 
+        "ftp_port": 21, 
+        "other_hosts": [], 
+        "alias": "note", 
+        "ssh_user": "nabrodov", 
+        "ssh_password": "aqwersdf", 
+        "ssh_cert": "", 
+        "os": "linux"
+    }, 
+    "rtrs_win": {
+        "description": "Moscow server windows (Emercom 2.0)", 
+        "tags": [
+            "work", 
+            "moscow"
+        ], 
+        "ip": "192.168.165.19", 
+        "host": "", 
+        "attrs": {
+            "rdp_user": "Administartor", 
+            "rdp_password": "1"
+        }, 
+        "groups": [
+            "rdp"
+        ], 
+        "projects": [], 
+        "ftp_port": 21, 
+        "other_hosts": [], 
+        "alias": "rtrs_win", 
+        "os": "windows"
+    }, 
+    "home": {
+        "description": "Home media server (Stora)", 
+        "tags": [
+            "private"
+        ], 
+        "ssh_port": 8822, 
+        "ip": "109.230.153.135", 
+        "host": "home.averr.in", 
+        "groups": [
+            "ssh", 
+            "normal", 
+            "private"
+        ], 
+        "projects": [], 
+        "ftp_port": 8821, 
+        "other_hosts": [], 
+        "alias": "home", 
+        "ssh_user": "averrin", 
+        "ssh_password": "aqwersdf", 
+        "ssh_cert": "", 
+        "os": "linux"
+    }, 
+    "rtrs_linux": {
+        "description": "Moscow server linux (Emercom 2.0)", 
+        "tags": [
+            "work", 
+            "moscow"
+        ], 
+        "ssh_port": 22, 
+        "ip": "192.168.165.22", 
+        "host": "", 
+        "attrs": {
+            "oracle_pass": "gwlxTjK", 
+            "oracle_user": "service2"
+        }, 
+        "groups": [
+            "ssh", 
+            "normal"
+        ], 
+        "projects": [
+            "dev", 
+            "emercom", 
+            "api"
+        ], 
+        "ftp_port": 21, 
+        "other_hosts": [], 
+        "alias": "rtrs_linux", 
+        "ssh_user": "admins", 
+        "ssh_password": "Crypto123", 
+        "ssh_cert": "", 
+        "os": "linux"
+    }
+}

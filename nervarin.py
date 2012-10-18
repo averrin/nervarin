@@ -1,143 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# SERVERS DEFS
-servers = {
-    'dev': {
-        'ip': '10.137.190.6',
-        'os': 'linux',
-        'host': 's4.lcs.local',
-        'other_hosts': [
-            'dev.lcs.local',
-            'gitlab.lcs.local',
-            'emercom.lcs.local',
-            'sentry.lcs.local'
-        ],
-        'tags': ['work', 'spb'],
-        'projects': ['dev', 'emercom', 'api'],
-        'ssh_port': 22,
-        'ssh_user': 'nabrodov',
-        'ssh_password': 'aqwersdf',
-        'ssh_cert': '',
-        'ftp_port': 21,
-        'description': 'Work dev server',
-    },
-    'note': {
-        'ip': '10.137.190.141',
-        'os': 'linux_',
-        'host': '',
-        'other_hosts': [],
-        'tags': ['work', 'spb'],
-        'projects': ['dev', 'emercom', 'api'],
-        'ssh_port': 22,
-        'ssh_user': 'nabrodov',
-        'ssh_password': 'aqwersdf',
-        'ssh_cert': '',
-        'ftp_port': 21,
-        'description': 'Work demo server'
-    },
-
-    'moscow_linux': {
-        'ip': '10.137.191.77',
-        'os': 'linux',
-        'host': '',
-        'other_hosts': [],
-        'tags': ['work', 'moscow'],
-        'projects': ['dev', 'emercom', 'api'],
-        'ssh_port': 22,
-        'ssh_user': 'root',
-        'ssh_password': 'vjrhtvt17',
-        'ssh_cert': '',
-        'ftp_port': 21,
-        'description': 'Moscow server linux (Emercom 2.0)',
-        'keys': {
-            'oracle_user': 'service2',
-            'oracle_pass': 'gwlxTjK'
-        }
-    },
-    'rtrs_win': {
-        'ip': '192.168.165.19',
-        'os': 'windows',
-        'host': '',
-        'other_hosts': [],
-        'tags': ['work', 'moscow'],
-        'projects': [],
-        'ftp_port': 21,
-        'description': 'Moscow server windows (Emercom 2.0)',
-        "keys": {
-            'rdp_user': 'Administartor',
-            'rdp_password': '1'
-        }
-    },
-
-    'rtrs_linux': {
-        'ip': '192.168.165.22',
-        'os': 'linux',
-        'host': '',
-        'other_hosts': [],
-        'tags': ['work', 'moscow'],
-        'projects': ['dev', 'emercom', 'api'],
-        'ssh_port': 22,
-        'ssh_user': 'admins',
-        'ssh_password': 'Crypto123',
-        'ssh_cert': '',
-        'ftp_port': 21,
-        'description': 'Moscow server linux (Emercom 2.0)',
-        'keys': {
-            'oracle_user': 'service2',
-            'oracle_pass': 'gwlxTjK'
-        }
-    },
-
-
-    'clodo': {
-        'ip': '62.76.40.97',
-        'os': 'linux',
-        'host': 'averr.in',
-        'other_hosts': ['me.averr.in', 'files.averr.in'],
-        'tags': ['private'],
-        'projects': ['eliar'],
-        'ssh_port': 22,
-        'ssh_user': 'averrin',
-        'ssh_password': 'aqwersdf',
-        'ssh_cert': '',
-        'ftp_port': 21,
-        'description': 'Clodo private server'
-    },
-    'home': {
-        'ip': '109.230.153.135',
-        'os': 'linux',
-        'host': 'home.averr.in',
-        'other_hosts': [],
-        'tags': ['private'],
-        'projects': [],
-        'ssh_port': 8822,
-        'ssh_user': 'averrin',
-        'ssh_password': 'aqwersdf',
-        'ssh_cert': '',
-        'ftp_port': 8821,
-        'description': 'Home media server (Stora)'
-    },
-    'aws': {
-        'ip': '107.22.234.119',
-        'os': 'linux',
-        'host': 'aws.averr.in',
-        'other_hosts': [],
-        'tags': ['private', 'aws'],
-        'projects': ['evernight'],
-        'ssh_port': 22,
-        'ssh_user': 'averrin',
-        'ssh_password': '',
-        'ssh_cert': 'aws_ssh_averrin',
-        'ftp_port': 21,
-        'description': 'Amazon cloud server',
-        "keys": {
-            "aws_id": 'AKIAIQ4CB4POAICCQVIA',
-            "aws_key": 'SbTGinDN+P5n0IIGmvc4CwVzZFb2IojtG9Q9dF+O'
-        }
-    }
-}
-
 #MODULES
 
 try:
@@ -145,8 +8,10 @@ try:
     from fabric.api import run, env, open_shell, put, sudo, get, prompt, puts
     from fabric.colors import red
     from fabric.decorators import task
+    from fabric.tasks import execute
     import os
     import shutil
+    import json
 except ImportError:
     print 'Plz install deps:'
     print '>\tsudo pip install fabric bottle boto'
@@ -155,9 +20,27 @@ except ImportError:
 
 # CONFIG
 PORT = 8080
+serve_key = 'aqwersdf'
 ssh_startup = 'tmux new-session -t default || tmux new-session -s default'
 packages = ['tmux', 'zsh', 'curl', 'w3m', 'autojump', 'vim']
 pm_args = {'apt-get': '-ym --force-yes', 'yum': '-y'}
+
+central_server = 'averrin@aws.averr.in:22'
+new_server = {
+        "description": "",
+        "tags": [],
+        "ssh_port": 22,
+        "ip": "",
+        "host": "",
+        "groups": ["ssh"],
+        "projects": [],
+        "ftp_port": 21,
+        "other_hosts": [],
+        "ssh_user": "averrin",
+        "ssh_password": "",
+        "ssh_cert": "",
+        "os": "linux"
+    }
 
 TEMPLATE = """
 <!DOCTYPE html>
@@ -170,16 +53,31 @@ TEMPLATE = """
     <link rel="stylesheet" href="http://averr.in/static/gen/packed.css?1304342019"> -->
   </head>
   <body>
-    <div style="width: 400px; margin: 6px auto;">
+    <div class="row-fluid" style="padding-top: 6px;">
         {% for name,s in servers %}
-            <div class="well">
-                <h4>{% if s.host %}{{s.host}}{% else %}{{name}}{% endif %} <span class="label">{{s.os}}</span></h4>
+            <div class="well span4" style="height: 300px; margin-left: 6px; overflow-y: auto;">
+                <h4>{{s.alias}} <small>{% if s.host %}{{s.host}}{% else %}{{s.ip}}{% endif %}</small></h4>
                 <strong>IP:</strong> {{s.ip}} <br />
+                <strong>OS:</strong> {{s.os}} <br />
                 {% if s.os=="linux" %}<strong>SSH:</strong> ssh {{s.ssh_user}}{% if s.ssh_password %}:{{s.ssh_password}}{% endif %}@{% if s.host %}{{s.host}}{% else %}{{s.ip}}{% endif %} -p {{s.ssh_port}} <br />{% endif %}
                 {% if s.os=="linux" %}<strong>FTP port:</strong> {{s.ftp_port}} <br />{% endif %}
                 {% if s.other_hosts %}<strong>other_hosts:</strong> {{s.other_hosts|join(', ')}} <br />{% endif %}
                 <strong>Tags:</strong> {% for tag in s.tags %}<span class="label label-success">{{tag}}</span> {% endfor %} <br />
-                {% if s.}
+                {% if s.attrs %}
+                    <strong>Attributes:</strong>
+                    <ul>
+                        {% for k,v in s.attrs.iteritems() %}
+                        <li><strong>{{k}}:</strong> {{v}}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if s.groups %}
+                    <strong>Groups:</strong>
+                        {% for g in s.groups %}
+                            <span class="label label-info">{{g}}</span>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
             </div>
         {% endfor %}
     </div>
@@ -190,7 +88,7 @@ TEMPLATE = """
 """
 
 tmux_conf = """
-set-option -g default-shell "{shell}"
+set-option -g default-shell "{{shell}}"
 unbind C-b
 unbind l
 set -g prefix C-a
@@ -237,7 +135,7 @@ plugins=(git)
 source $ZSH/oh-my-zsh.sh
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games
 #source /usr/share/autojump/autojump.sh
-PS1="(%{$fg[cyan]%}{server}%{$reset_color%}) $PS1"
+PS1="(%{$fg[cyan]%}{{server}}%{$reset_color%}) $PS1"
 """
 
 # ENDCONFIG
@@ -304,9 +202,25 @@ vuo3RSTtBCQeyEIg95omvbq8zvyWKgiFsTg9+dRcNrutfaawuEqVx6tfvjCs7pS7
 
 
 # SERVERS LOGIC
+@task
+def backup_json():
+    """
+        Backup servers on central server
+    """
+    put('servers.json', '.')
+
+
+@task
+def update_json():
+    """
+    Update servers from central server
+    """
+    get('servers.json', '.')
+
+
 class ServerList(dict):
     def __init__(self):
-        self.update(servers)
+        self.load()
         self.certs = certs
         self.by_tags = partial(self.by_attrs, 'tags')
         self.by_projects = partial(self.by_attrs, 'projects')
@@ -330,6 +244,18 @@ class ServerList(dict):
     def getCert(cls, key):
         return cls.certs[key]
 
+    def dump(self):
+        with file('servers.json', 'w') as f:
+            f.write(json.dumps(self, indent=4))
+
+    def load(self):
+        if os.path.isfile('servers.json'):
+            with file('servers.json', 'r') as f:
+                self.update(json.loads(f.read()))
+        else:
+            execute(update_json, hosts=[central_server])
+            self.load()
+
 
 # ETC
 def dump_to_file(filename, text, mod=777):
@@ -344,6 +270,7 @@ def clean():
     """
         Clean temp files
     """
+    os.system('chmod 777 -R .temp')
     if os.path.isdir('.temp'):
         shutil.rmtree('.temp')
 
@@ -351,6 +278,12 @@ def clean():
 def current():
     return SERVERS.by_attr('ip', env['host_string'].split('@')[1].split(':')[0])[0]
 
+
+env.key_filename = []
+clean()
+os.mkdir('.temp')
+for cert in certs:
+    env.key_filename.append(dump_to_file(cert, certs[cert], 400))
 
 SERVERS = ServerList()
 
@@ -360,17 +293,20 @@ for s in SERVERS:
 env.roledefs['linux'] = []
 for s in SERVERS.by_attr('os', 'linux'):
     env.passwords['%(ssh_user)s@%(ip)s:%(ssh_port)s' % s] = s['ssh_password']
+    s['host_string'] = '%(ssh_user)s@%(ip)s:%(ssh_port)s' % s
     env.passwords['%(ssh_user)s@%(host)s:%(ssh_port)s' % s] = s['ssh_password']
     for h in s['other_hosts']:
         env.passwords['%s@%s:%s' % (s['ssh_user'], h, s['ssh_port'])] = s['ssh_password']
     env.roledefs[s['alias']] = ['%(ssh_user)s@%(ip)s:%(ssh_port)s' % s]
-    env.roledefs['linux'].append('%(ssh_user)s@%(ip)s:%(ssh_port)s' % s)
 
-env.key_filename = []
-clean()
-os.mkdir('.temp')
-for cert in certs:
-    env.key_filename.append(dump_to_file(cert, certs[cert], 400))
+for s in SERVERS.values():
+    for g in s['groups']:
+        if not g in env.roledefs:
+            env.roledefs[g] = []
+        if 'ssh_user' in s:
+            env.roledefs[g].append('%(ssh_user)s@%(ip)s:%(ssh_port)s' % s)
+        else:
+            env.roledefs[g].append(s['ip'])
 
 
 # SERVE LOGIC
@@ -382,7 +318,7 @@ try:
 
     @route('/')
     def dump():
-        if not 'aqwersdf' in request.GET:
+        if not serve_key in request.GET:
             raise HTTPError(404, "These are not the droids you're looking for")
         return Template(TEMPLATE).render(servers=SERVERS.iteritems(), certs=SERVERS.certs)
 
@@ -426,7 +362,7 @@ def send_file(local, remote):
         Send file by scp
     """
     put(local, remote)
-    clean()
+    # clean()
 
 
 @task
@@ -435,7 +371,7 @@ def get_file(remote, local):
         Send file by scp
     """
     get(remote, local)
-    clean()
+    # clean()
 
 
 @task
@@ -444,23 +380,43 @@ def init(pm='apt-get'):
         Install must-have tools like tmux, zsh and others
     """
     env.warn_only = True
+    s = current()
+    if not 'pm' in s:
+        s['pm'] = pm
     for p in packages:
-        sudo('%s install %s %s' % (pm, p, pm_args[pm]))
+        sudo('%s install %s %s' % (s['pm'], p, pm_args[s['pm']]))
     run('curl -L https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh | sh')
     env.warn_only = False
     path = run('which zsh')
-    put(dump_to_file('.tmux.conf', tmux_conf.replace('{shell}', path)), '.')
-    put(dump_to_file('.zshrc', zshrc.replace('{server}', current()['alias'])), '.')
+    put(dump_to_file('.tmux.conf', tmux_conf.replace('{{shell}}', path)), '.')
+    put(dump_to_file('.zshrc', zshrc.replace('{{server}}', current()['alias'])), '.')
     # clean()
 
 
 @task
 def get_info():
+    """
+        Get server info
+    """
     from pprint import pprint
     pprint(current())
     run('lsb_release -a', shell=False)
     run('uname -a', shell=False)
-    clean()
+    # clean()
+
+
+@task
+def full_backup():
+    """
+        Backup servers and this file on central server
+    """
+    backup_json()
+    put(env['fabfile'], '.')
+
+
+@task
+def test():
+    print env
 
 if __name__ == "__main__":
     os.system('ipython --quick -c "import nervarin as n" -i')
