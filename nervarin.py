@@ -10,8 +10,9 @@ try:
     # from fabric.api import puts as fabprint
     from fabric.colors import red, green, cyan, yellow
     from fabric.decorators import task
-    from fabric.tasks import execute
+    # from fabric.tasks import execute
     import os
+    import sys
     import shutil
     import json
 except ImportError:
@@ -27,6 +28,14 @@ ssh_startup = 'tmux new-session -t default || tmux new-session -s default'
 packages = ['tmux', 'zsh', 'curl', 'w3m', 'autojump', 'vim']
 pm_args = {'apt-get': '-ym --force-yes', 'yum': '-y'}
 
+if os.path.basename(sys.argv[0]) == 'fab':
+    home_folder = os.path.split(os.path.abspath(env['fabfile']))[0] + '/'
+elif os.path.basename(sys.argv[0]) == 'ipython':
+    home_folder = os.path.abspath('.')
+else:
+    home_folder = os.path.split(os.path.abspath(sys.argv[0]))[0] + '/'
+
+remote_folder = '.'
 central_server = '-i .temp/aws_ssh_averrin averrin@aws.averr.in'
 new_server = {
         "description": "",
@@ -53,18 +62,25 @@ TEMPLATE = """
     <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/css/bootstrap-combined.min.css" rel="stylesheet">
     <!-- <link rel="stylesheet" href="http://averr.in/static/gen/bp_packed.css?1311598113">
     <link rel="stylesheet" href="http://averr.in/static/gen/packed.css?1304342019"> -->
+    <link rel="stylesheet" href="http://documentcloud.github.com/visualsearch/build-min/visualsearch-datauri.css" />
+    <link rel="shortcut icon" href="http://averr.in/static/favicon.ico">
   </head>
   <body>
+      <div class="visual_search" style="width: 600px; margin: 6px auto;"></div>
     <div class="row-fluid" style="padding-top: 6px;">
         {% for name,s in servers %}
-            <div class="well span4" style="height: 300px; margin-left: 6px; overflow-y: auto;">
+            <div class="well span4" style="height: 300px; margin-left: 6px; overflow-y: auto;" id="{{s.alias}}">
                 <h4>{{s.alias}} <small>{% if s.host %}{{s.host}}{% else %}{{s.ip}}{% endif %}</small></h4>
                 <strong>IP:</strong> {{s.ip}} <br />
                 <strong>OS:</strong> {{s.os}} <br />
-                {% if s.os=="linux" %}<strong>SSH:</strong> ssh {{s.ssh_user}}{% if s.ssh_password %}:{{s.ssh_password}}{% endif %}@{% if s.host %}{{s.host}}{% else %}{{s.ip}}{% endif %} -p {{s.ssh_port}} <br />{% endif %}
+                {% if s.os=="linux" %}<strong>SSH:</strong>{% if s.ssh_password %} sshpass -p {{s.ssh_password}}{% endif %} ssh {{s.ssh_user}}@{% if s.host %}{{s.host}}{% else %}{{s.ip}}{% endif %} -p {{s.ssh_port}} <br />{% endif %}
                 {% if s.os=="linux" %}<strong>FTP port:</strong> {{s.ftp_port}} <br />{% endif %}
                 {% if s.other_hosts %}<strong>other_hosts:</strong> {{s.other_hosts|join(', ')}} <br />{% endif %}
-                <strong>Tags:</strong> {% for tag in s.tags %}<span class="label label-success">{{tag}}</span> {% endfor %} <br />
+                <strong>Tags:</strong>
+                    <span class="tags">{% for tag in s.tags %}
+                        <span class="label label-success">{{tag}}</span>
+                    {% endfor %}
+                    </span><br />
                 {% if s.attrs %}
                     <strong>Attributes:</strong>
                     <ul>
@@ -75,9 +91,11 @@ TEMPLATE = """
                 {% endif %}
                 {% if s.groups %}
                     <strong>Groups:</strong>
+                        <span class="groups">
                         {% for g in s.groups %}
                             <span class="label label-info">{{g}}</span>
                         {% endfor %}
+                        </span>
                     </ul>
                 {% endif %}
             </div>
@@ -85,6 +103,54 @@ TEMPLATE = """
     </div>
     <script src="http://code.jquery.com/jquery-latest.js"></script>
     <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/js/bootstrap.min.js"></script>
+    <script src="http://documentcloud.github.com/visualsearch/build-min/dependencies.js"></script>
+    <script src="http://documentcloud.github.com/visualsearch/build-min/visualsearch.js"></script>
+        <script type="text/javascript" charset="utf-8">
+          $(document).ready(function() {
+            var visualSearch = VS.init({
+              container : $('.visual_search'),
+              query     : '',
+              callbacks : {
+                search: function(query, searchCollection) {
+                    sc = searchCollection;
+                    $.getJSON('/search', {q:query}).success(function(data){
+                        $('.well').hide()
+                        $.each(data.res, function(i,e){
+                            console.log(e)
+                            $('#'+e).show()
+                            })
+                        })
+                },
+                facetMatches : function(callback) {callback(['ip', 'host', 'tag', 'group'])},
+                valueMatches : function(facet, searchTerm, callback) { switch (facet) {
+                    case 'tag':
+                        callback([
+                          {% for tag in tags %}
+                            {value: '{{tag}}', label: '{{tag}}'},
+                          {%endfor%}
+                        ]);
+                        break;
+                    case 'host':
+                        callback([
+                          {% for host in hosts %}
+                            {value: '{{host}}', label: '{{host}}'},
+                          {%endfor%}
+                        ]);
+                        break;
+                    case 'group':
+                        callback([
+                          {% for group in groups %}
+                            {value: '{{group}}', label: '{{group}}'},
+                          {%endfor%}
+                        ]);
+                        break;
+                    }
+                }
+              }
+            });
+          });
+        </script>
+        <input type="hidden" value="{{key}}"/>
   </body>
 </html>
 """
@@ -210,7 +276,7 @@ def backup_json():
         Backup servers on central server
     """
     print cyan('> Servers sending to remote server')
-    put('servers.json', '.')
+    put(os.path.join(home_folder, 'servers.json'), remote_folder)
     print green('>\tServers saved on %s' % current()['alias'])
 
 
@@ -220,7 +286,7 @@ def update_json():
     Update servers from remote server
     """
     print cyan('> Servers getting from remote server')
-    scp_get('servers.json', '.')
+    scp_get('servers.json', home_folder)
     print green('>\tServers got from remote server')
 
 
@@ -229,6 +295,7 @@ class ServerList(dict):
         self.load()
         self.certs = certs
         self.by_tags = partial(self.by_attrs, 'tags')
+        self.by_groups = partial(self.by_attrs, 'groups')
         self.by_projects = partial(self.by_attrs, 'projects')
         self.by_hosts = partial(self.by_attrs, 'other_hosts')
         print green('>\tServers loaded')
@@ -252,28 +319,30 @@ class ServerList(dict):
         return cls.certs[key]
 
     def save(self):
-        with file('servers.json', 'w') as f:
+        with file(os.path.join(home_folder, 'servers.json'), 'w') as f:
             f.write(json.dumps(self, indent=4))
 
     def load(self):
-        if os.path.isfile('servers.json'):
+        if os.path.isfile(os.path.join(home_folder, 'servers.json')):
             print cyan('> Local servers.json existed')
-            with file('servers.json', 'r') as f:
+            with file(os.path.join(home_folder, 'servers.json'), 'r') as f:
                 self.update(json.loads(f.read()))
         else:
             print yellow('> No local servers.json')
             # execute(update_json, hosts=[central_server])
             # update_json()
-            os.system('scp %s:servers.json .' % central_server)
+            print cyan('> Servers getting from remote server')
+            os.system('scp %s:servers.json %s' % (central_server, home_folder))
+            print green('>\tServers got from remote server')
             self.load()
 
 
 # ETC
 def dump_to_file(filename, text, mod=777):
-    with file('.temp/' + filename, 'w') as f:
+    with file(os.path.join(home_folder, '.temp/', filename), 'w') as f:
         f.write(text)
-        os.system('chmod %s %s' % (mod, '.temp/' + filename))
-    return '.temp/' + filename
+        os.system('chmod %s %s' % (mod, os.path.join(home_folder, '.temp/', filename)))
+    return os.path.join(home_folder, '.temp/', filename)
 
 
 @task
@@ -281,9 +350,9 @@ def clean():
     """
         Clean temp files
     """
-    os.system('chmod 777 -R .temp')
-    if os.path.isdir('.temp'):
-        shutil.rmtree('.temp')
+    os.system('chmod 777 -R %s' % os.path.join(home_folder, '.temp'))
+    if os.path.isdir(os.path.join(home_folder, '.temp')):
+        shutil.rmtree(os.path.join(home_folder, '.temp'))
 
 
 def current():
@@ -292,11 +361,10 @@ def current():
 
 env.key_filename = []
 clean()
-os.mkdir('.temp')
+os.mkdir(os.path.join(home_folder, '.temp'))
 for cert in certs:
     env.key_filename.append(dump_to_file(cert, certs[cert], 400))
 
-# file('servers.json', 'w').write('{}')
 SERVERS = ServerList()
 
 for s in SERVERS:
@@ -332,14 +400,49 @@ try:
     def dump():
         if not serve_key in request.GET:
             raise HTTPError(404, "These are not the droids you're looking for")
-        return Template(TEMPLATE).render(servers=SERVERS.iteritems(), certs=SERVERS.certs)
+        hosts = sum([a['other_hosts'] for a in SERVERS.values()], [])
+        hosts.extend(sorted(list(set([a['host'] for a in SERVERS.values()])))[1:])
+        hosts.extend(sorted(list(set([a['host'] for a in SERVERS.values()])))[1:])
+        tags = list(set(sum([a['tags'] for a in SERVERS.values()], [])))
+        groups = list(set(sum([a['groups'] for a in SERVERS.values()], [])))
+        return Template(TEMPLATE).render(servers=SERVERS.iteritems(),
+            certs=SERVERS.certs,
+            tags=tags,
+            hosts=hosts,
+            groups=groups,
+            key=serve_key
+            )
+
+    @route('/search')
+    def search():
+        _query = map(lambda x: x.strip(' "'), request.GET['q'].split(' '))
+        query = {}
+        for i, f in enumerate(_query):
+            if f.endswith(':'):
+                if not f.strip(':') in query:
+                    query[f.strip(':')] = []
+                query[f.strip(':')].append(_query[i + 1])
+        res = map(lambda x: x['alias'], SERVERS.values())
+        bt = []
+        bg = []
+        if 'tag' in query:
+            bt = map(lambda x: x['alias'], SERVERS.by_tags(*query['tag']))
+        if 'group' in query:
+            bg = map(lambda x: x['alias'], SERVERS.by_groups(*query['group']))
+        # if 'host' in query:
+            # res = SERVERS.by_attr('host', query['host'])[0]['alias']
+        if bt:
+            res = set(res) & set(bt)
+        if bg:
+            res = set(res) & set(bg)
+        return json.dumps({'res': list(set(res))})
 
     @task
     def serve():
         """
             Run web-server for html version of servers list
         """
-        server_run(host='0.0.0.0', port=PORT, reloader=True)
+        server_run(host='0.0.0.0', port=PORT, reloader=True, server='twisted')
 
 except:
     print red('Serve not supported. Need Bottle and Jinja2')
@@ -431,7 +534,7 @@ def full_backup():
     print cyan('> Performing full backup')
     backup_json()
     print cyan('> Nervarin sending to remote server')
-    put(env['fabfile'], '.')
+    put(env['fabfile'], remote_folder)
     print green('>\tNervarin saved on %s' % current()['alias'])
 
 

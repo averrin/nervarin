@@ -103,7 +103,9 @@
         "host": "", 
         "attrs": {
             "oracle_pass": "gwlxTjK", 
-            "oracle_user": "service2"
+            "oracle_user": "service2",
+            "emercom_user": "Admin",
+            "emercom_pass": "vjrhtvt17"
         }, 
         "groups": [
             "ssh", 
@@ -201,7 +203,9 @@
         "host": "", 
         "attrs": {
             "oracle_pass": "gwlxTjK", 
-            "oracle_user": "service2"
+            "oracle_user": "service2",
+            "emercom_user": "Admin",
+            "emercom_pass": "Crypto123"
         }, 
         "groups": [
             "ssh", 
