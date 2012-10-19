@@ -26,7 +26,7 @@ except ImportError:
 # CONFIG
 PORT = 8080
 serve_key = 'aqwersdf'
-ssh_startup = 'tmux new-session -t default || tmux new-session -s default'
+ssh_startup = 'TERM=xterm-256color tmux new-session -t default || TERM=xterm-256color tmux new-session -s default'
 packages = ['tmux', 'zsh', 'curl', 'w3m', 'autojump', 'vim']
 pip_packages = ['supervisor', 'fabric', 'virtualenv']
 pm_args = {'apt-get': '-ym --force-yes', 'yum': '-y'}
@@ -207,8 +207,10 @@ def get_bucket(bucket):
 
 
 def get_s3_var(filename, bucket='averrin'):
+    print cyan('> Servers getting file from S3')
     b = get_bucket(bucket)
     k = b.get_key(filename)
+    print green('>\tServers got %s from S3' % filename)
     return k.get_contents_as_string()
 
 
@@ -326,8 +328,10 @@ def shell(native=False, tmux=True):
         Open common ssh shell
     """
     if native or eval(str(native)):
+        print cyan('> Opening native fabric shell')
         open_shell(ssh_startup if eval(str(tmux)) else '')
     else:
+        print cyan('> Opening ssh shell')
         key = current()['ssh_cert']
         password = SERVERS.by_attr('ip', env['host_string'].split('@')[1].split(':')[0])[0]['ssh_password']
         if key:
@@ -377,15 +381,22 @@ def init(full=False):
     """
     env.warn_only = True
     if eval(str(full)):
+        print cyan('> Perfom full init')
         for p in packages:
             install(p)
         for p in pip_packages:
             pip(p)
         run('curl -L https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh | sh')
     env.warn_only = False
+    print cyan('Renew configs')
     path = run('which zsh')
     put(dump_to_file('.tmux.conf', get_s3_var('tmux.conf').replace('{{shell}}', path)), '.')
-    put(dump_to_file('.zshrc', Template(get_s3_var('zshrc')).render({'server': current()['alias'], 'aliases': aliases})), '.')
+    put(dump_to_file('.zshrc', Template(
+        get_s3_var('zshrc')).render({
+            'server': current()['alias'],
+            'aliases': aliases,
+            'color': current().get('color', None)
+            })), '.')
     for cf in cloud_files:
         run('wget "https://s3.amazonaws.com/%(bucket)s/%(key)s" -O %(path)s' % cf)
     # clean()
@@ -396,11 +407,19 @@ def get_info():
     """
         Get server info
     """
-    from pprint import pprint
-    pprint(current())
+    print cyan('> Getting server info')
+    import pprint
+    # from pygments import highlight
+    # from pygments.lexers import JSONLexer
+    # from pygments.formatters import Terminal256Formatter
+    # print green('>\t"%s" server info' % current()['alias'])
+    # print highlight(pprint.pformat(current()), JSONLexer(), Terminal256Formatter())
+    pprint.pprint(current())
+    env.warn_only = True
     run('lsb_release -a', shell=False)
     run('uname -a', shell=False)
     run('uptime', shell=False)
+    env.warn_only = False
     # clean()
 
 

@@ -25,7 +25,8 @@
         "ssh_user": "averrin", 
         "ssh_password": "aqwersdf", 
         "ssh_cert": "", 
-        "os": "linux"
+        "os": "linux",
+        "color": 251
     }, 
     "aws": {
         "description": "Amazon cloud server", 
@@ -56,7 +57,8 @@
         "ssh_user": "averrin", 
         "ssh_password": "aqwersdf", 
         "ssh_cert": "aws_ssh_averrin", 
-        "os": "linux"
+        "os": "linux",
+        "color": 165
     }, 
     "dev": {
         "description": "Work dev server", 
@@ -91,7 +93,8 @@
         "ssh_cert": "", 
         "os": "linux", 
         "pm": "yum",
-        "pip": "pip-python"
+        "pip": "pip-python",
+        "color": 156
     }, 
     "moscow_linux": {
         "description": "Moscow server linux (Emercom 2.0)", 
@@ -124,7 +127,8 @@
         "ssh_user": "root", 
         "ssh_password": "vjrhtvt17", 
         "ssh_cert": "", 
-        "os": "linux"
+        "os": "linux",
+        "color": 82
     }, 
     "note": {
         "description": "Work demo server", 
@@ -227,6 +231,7 @@
         "ssh_user": "admins", 
         "ssh_password": "Crypto123", 
         "ssh_cert": "", 
-        "os": "linux"
+        "os": "linux",
+        "color": 96
     }
 }
