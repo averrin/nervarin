@@ -5,7 +5,7 @@
 
 try:
     from functools import partial
-    from fabric.api import run, env, open_shell, put, sudo, local
+    from fabric.api import run, env, open_shell, put, sudo, local, parallel
     from fabric.api import get as scp_get
     # from fabric.api import puts as fabprint
     from fabric.colors import red, green, cyan, yellow
@@ -15,6 +15,8 @@ try:
     import sys
     import shutil
     import json
+    import boto
+    from boto.s3.key import Key
 except ImportError:
     print 'Plz install deps:'
     print '>\tsudo pip install fabric bottle boto'
@@ -29,6 +31,10 @@ packages = ['tmux', 'zsh', 'curl', 'w3m', 'autojump', 'vim']
 pip_packages = ['supervisor', 'fabric', 'virtualenv']
 pm_args = {'apt-get': '-ym --force-yes', 'yum': '-y'}
 aliases = {'!': 'sudo', 'pipi': 'sudo pip install'}
+
+cloud_files = [
+    {'key': 'vimrc', 'path': '~/.vimrc', 'bucket': 'averrin'},
+    ]
 
 if os.path.basename(sys.argv[0]) == 'fab':
     home_folder = os.path.split(os.path.abspath(env['fabfile']))[0] + '/'
@@ -54,169 +60,6 @@ new_server = {
         "ssh_cert": "",
         "os": "linux"
     }
-
-TEMPLATE = """
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Nervarin</title>
-    <!-- Bootstrap -->
-    <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/css/bootstrap-combined.min.css" rel="stylesheet">
-    <!-- <link rel="stylesheet" href="http://averr.in/static/gen/bp_packed.css?1311598113">
-    <link rel="stylesheet" href="http://averr.in/static/gen/packed.css?1304342019"> -->
-    <link rel="stylesheet" href="http://documentcloud.github.com/visualsearch/build-min/visualsearch-datauri.css" />
-    <link rel="shortcut icon" href="http://averr.in/static/favicon.ico">
-  </head>
-  <body>
-      <div class="visual_search" style="width: 600px; margin: 6px auto;"></div>
-    <div class="row-fluid" style="padding-top: 6px;">
-        {% for name,s in servers %}
-            <div class="well span4" style="height: 300px; margin-left: 6px; overflow-y: auto;" id="{{s.alias}}">
-                <h4>{{s.alias}} <small>{% if s.host %}{{s.host}}{% else %}{{s.ip}}{% endif %}</small></h4>
-                <strong>IP:</strong> {{s.ip}} <br />
-                <strong>OS:</strong> {{s.os}} <br />
-                {% if s.os=="linux" %}<strong>SSH:</strong>{% if s.ssh_password %} sshpass -p {{s.ssh_password}}{% endif %} ssh {{s.ssh_user}}@{% if s.host %}{{s.host}}{% else %}{{s.ip}}{% endif %} -p {{s.ssh_port}} <br />{% endif %}
-                {% if s.os=="linux" %}<strong>FTP port:</strong> {{s.ftp_port}} <br />{% endif %}
-                {% if s.other_hosts %}<strong>other_hosts:</strong> {{s.other_hosts|join(', ')}} <br />{% endif %}
-                <strong>Tags:</strong>
-                    <span class="tags">{% for tag in s.tags %}
-                        <span class="label label-success">{{tag}}</span>
-                    {% endfor %}
-                    </span><br />
-                {% if s.attrs %}
-                    <strong>Attributes:</strong>
-                    <ul>
-                        {% for k,v in s.attrs.iteritems() %}
-                        <li><strong>{{k}}:</strong> {{v}}</li>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
-                {% if s.groups %}
-                    <strong>Groups:</strong>
-                        <span class="groups">
-                        {% for g in s.groups %}
-                            <span class="label label-info">{{g}}</span>
-                        {% endfor %}
-                        </span>
-                    </ul>
-                {% endif %}
-            </div>
-        {% endfor %}
-    </div>
-    <script src="http://code.jquery.com/jquery-latest.js"></script>
-    <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/js/bootstrap.min.js"></script>
-    <script src="http://documentcloud.github.com/visualsearch/build-min/dependencies.js"></script>
-    <script src="http://documentcloud.github.com/visualsearch/build-min/visualsearch.js"></script>
-        <script type="text/javascript" charset="utf-8">
-          $(document).ready(function() {
-            var visualSearch = VS.init({
-              container : $('.visual_search'),
-              query     : '',
-              callbacks : {
-                search: function(query, searchCollection) {
-                    sc = searchCollection;
-                    $.getJSON('/search', {q:query}).success(function(data){
-                        $('.well').hide()
-                        $.each(data.res, function(i,e){
-                            console.log(e)
-                            $('#'+e).show()
-                            })
-                        })
-                },
-                facetMatches : function(callback) {callback(['ip', 'host', 'tag', 'group'])},
-                valueMatches : function(facet, searchTerm, callback) { switch (facet) {
-                    case 'tag':
-                        callback([
-                          {% for tag in tags %}
-                            {value: '{{tag}}', label: '{{tag}}'},
-                          {%endfor%}
-                        ]);
-                        break;
-                    case 'host':
-                        callback([
-                          {% for host in hosts %}
-                            {value: '{{host}}', label: '{{host}}'},
-                          {%endfor%}
-                        ]);
-                        break;
-                    case 'group':
-                        callback([
-                          {% for group in groups %}
-                            {value: '{{group}}', label: '{{group}}'},
-                          {%endfor%}
-                        ]);
-                        break;
-                    case 'ip':
-                        callback([
-                          {% for ip in ips %}
-                            {value: '{{ip}}', label: '{{ip}}'},
-                          {%endfor%}
-                        ]);
-                        break;
-                                        }
-                }
-              }
-            });
-          });
-        </script>
-        <input type="hidden" value="{{key}}"/>
-  </body>
-</html>
-"""
-
-tmux_conf = """
-set-option -g default-shell "{{shell}}"
-unbind C-b
-unbind l
-set -g prefix C-a
-bind-key C-a last-window
-set-option -g mouse-select-pane on
-unbind %
-bind | split-window -h
-bind - split-window -v
-bind % killp
-bind a displayp \; lsp
-bind h neww htop
-bind r source-file ~/.tmux.conf
-set -g default-terminal "screen-256color"
-set -g history-limit 1000
-set-window-option -g mode-keys vi # vi key
-set-option -g status-keys vi
-set-window-option -g utf8 on
-set-window-option -g mode-mouse off
-set-option -g base-index 1
-set-option -g status-utf8 on
-set-option -g status-justify right
-set-option -g status-bg black
-set-option -g status-fg white
-set-option -g status-interval 5
-set-option -g status-left-length 30
-set-option -g status-left '#[fg=red,bold]» #[fg=blue,bold]#T#[default]'
-set-option -g status-right '#[fg=white,bold]»» #[fg=blue,bold]###S #[fg=red]%R %d.%m#(acpi | cut -d ',' -f 2)#[default]'
-set-option -g visual-activity on
-set-window-option -g monitor-activity on
-set-window-option -g window-status-current-fg white
-set-window-option -g window-status-current-bg default
-set-window-option -g window-status-current-attr bold
-set-window-option -g clock-mode-colour cyan
-set-window-option -g clock-mode-style 24
-set-window-option -g window-status-fg white
-set-window-option -g window-status-attr dim
-set -g default-terminal screen-256color
-"""
-
-zshrc = """
-ZSH=$HOME/.oh-my-zsh
-ZSH_THEME="sorin"
-plugins=(git)
-source $ZSH/oh-my-zsh.sh
-export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games
-#source /usr/share/autojump/autojump.sh
-PS1="(%{$fg[cyan]%}{{server}}%{$reset_color%}) $PS1"
-{% for a,c in aliases.iteritems() %}
-alias {{a}}="{{c}}"
-{% endfor %}
-"""
 
 # ENDCONFIG
 
@@ -357,6 +200,18 @@ def dump_to_file(filename, text, mod=777):
     return os.path.join(home_folder, '.temp/', filename)
 
 
+def get_bucket(bucket):
+    conn = boto.connect_s3(SERVERS['aws']['attrs']['aws_id'], SERVERS['aws']['attrs']['aws_key'])
+    b = conn.get_bucket(bucket)
+    return b
+
+
+def get_s3_var(filename, bucket='averrin'):
+    b = get_bucket(bucket)
+    k = b.get_key(filename)
+    return k.get_contents_as_string()
+
+
 @task
 def clean():
     """
@@ -418,7 +273,7 @@ try:
         groups = list(set(sum([a['groups'] for a in SERVERS.values()], [])))
         ips = [a['ip'] for a in SERVERS.values()]
 
-        return Template(TEMPLATE).render(servers=SERVERS.iteritems(),
+        return Template(get_s3_var('nervarin.html')).render(servers=SERVERS.iteritems(),
             certs=SERVERS.certs,
             tags=tags,
             hosts=hosts,
@@ -515,6 +370,7 @@ def install(package):
 
 
 @task
+@parallel
 def init(full=False):
     """
         Install must-have tools like tmux, zsh and others
@@ -528,8 +384,10 @@ def init(full=False):
         run('curl -L https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh | sh')
     env.warn_only = False
     path = run('which zsh')
-    put(dump_to_file('.tmux.conf', tmux_conf.replace('{{shell}}', path)), '.')
-    put(dump_to_file('.zshrc', Template(zshrc).render({'server': current()['alias'], 'aliases': aliases})), '.')
+    put(dump_to_file('.tmux.conf', get_s3_var('tmux.conf').replace('{{shell}}', path)), '.')
+    put(dump_to_file('.zshrc', Template(get_s3_var('zshrc')).render({'server': current()['alias'], 'aliases': aliases})), '.')
+    for cf in cloud_files:
+        run('wget "https://s3.amazonaws.com/%(bucket)s/%(key)s" -O %(path)s' % cf)
     # clean()
 
 
@@ -578,6 +436,27 @@ def pip(package):
 @task
 def test():
     print env
+
+
+@task
+def edit_s3_file(filename, public=True, bucket='averrin'):
+    b = get_bucket(bucket)
+    k = b.get_key(filename)
+    k.get_contents_to_file(file(os.path.join(home_folder, '.temp', filename), 'w'))
+    os.system('vim %s' % os.path.join(home_folder, '.temp', filename))
+    k.set_contents_from_file(file(os.path.join(home_folder, '.temp', filename), 'r'))
+    if eval(str(public)):
+        k.set_acl('public-read')
+
+
+@task
+def add_s3_file(filename, public=True, bucket='averrin'):
+    b = get_bucket(bucket)
+    k = Key(b)
+    k.key = os.path.basename(filename)
+    k.set_contents_from_file(file(filename, 'r'))
+    if eval(str(public)):
+        k.set_acl('public-read')
 
 
 if __name__ == "__main__":

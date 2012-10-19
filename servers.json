@@ -70,7 +70,8 @@
         "groups": [
             "ssh", 
             "normal", 
-            "active"
+            "active",
+            "work"
         ], 
         "projects": [
             "dev", 
@@ -109,7 +110,8 @@
         }, 
         "groups": [
             "ssh", 
-            "normal"
+            "normal",
+            "work"
         ], 
         "projects": [
             "dev", 
@@ -134,7 +136,8 @@
         "ip": "10.137.190.141", 
         "host": "", 
         "groups": [
-            "ssh"
+            "ssh",
+            "work"
         ], 
         "projects": [
             "dev", 
@@ -162,7 +165,8 @@
             "rdp_password": "1"
         }, 
         "groups": [
-            "rdp"
+            "rdp",
+            "work"
         ], 
         "projects": [], 
         "ftp_port": 21, 
@@ -209,7 +213,8 @@
         }, 
         "groups": [
             "ssh", 
-            "normal"
+            "normal",
+            "work"
         ], 
         "projects": [
             "dev", 

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Nervarin</title>
+    <!-- Bootstrap -->
+    <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/css/bootstrap-combined.min.css" rel="stylesheet">
+    <!-- <link rel="stylesheet" href="http://averr.in/static/gen/bp_packed.css?1311598113">
+    <link rel="stylesheet" href="http://averr.in/static/gen/packed.css?1304342019"> -->
+    <link rel="stylesheet" href="http://documentcloud.github.com/visualsearch/build-min/visualsearch-datauri.css" />
+    <link rel="shortcut icon" href="http://averr.in/static/favicon.ico">
+  </head>
+  <body>
+      <div class="visual_search" style="width: 600px; margin: 6px auto;"></div>
+    <div class="row-fluid" style="padding-top: 6px;">
+        {% for name,s in servers %}
+            <div class="well span4" style="height: 300px; margin-left: 6px; overflow-y: auto;" id="{{s.alias}}">
+                <h4>{{s.alias}} <small>{% if s.host %}{{s.host}}{% else %}{{s.ip}}{% endif %}</small></h4>
+                <strong>IP:</strong> {{s.ip}} <br />
+                <strong>OS:</strong> {{s.os}} <br />
+                {% if s.os=="linux" %}<strong>SSH:</strong>{% if s.ssh_password %} sshpass -p {{s.ssh_password}}{% endif %} ssh {{s.ssh_user}}@{% if s.host %}{{s.host}}{% else %}{{s.ip}}{% endif %} -p {{s.ssh_port}} <br />{% endif %}
+                {% if s.os=="linux" %}<strong>FTP port:</strong> {{s.ftp_port}} <br />{% endif %}
+                {% if s.other_hosts %}<strong>other_hosts:</strong> {{s.other_hosts|join(', ')}} <br />{% endif %}
+                <strong>Tags:</strong>
+                    <span class="tags">{% for tag in s.tags %}
+                        <span class="label label-success">{{tag}}</span>
+                    {% endfor %}
+                    </span><br />
+                {% if s.attrs %}
+                    <strong>Attributes:</strong>
+                    <ul>
+                        {% for k,v in s.attrs.iteritems() %}
+                        <li><strong>{{k}}:</strong> {{v}}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if s.groups %}
+                    <strong>Groups:</strong>
+                        <span class="groups">
+                        {% for g in s.groups %}
+                            <span class="label label-info">{{g}}</span>
+                        {% endfor %}
+                        </span>
+                    </ul>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+    <script src="http://code.jquery.com/jquery-latest.js"></script>
+    <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.1.1/js/bootstrap.min.js"></script>
+    <script src="http://documentcloud.github.com/visualsearch/build-min/dependencies.js"></script>
+    <script src="http://documentcloud.github.com/visualsearch/build-min/visualsearch.js"></script>
+        <script type="text/javascript" charset="utf-8">
+          $(document).ready(function() {
+            var visualSearch = VS.init({
+              container : $('.visual_search'),
+              query     : '',
+              callbacks : {
+                search: function(query, searchCollection) {
+                    sc = searchCollection;
+                    $.getJSON('/search', {q:query}).success(function(data){
+                        $('.well').hide()
+                        $.each(data.res, function(i,e){
+                            console.log(e)
+                            $('#'+e).show()
+                            })
+                        })
+                },
+                facetMatches : function(callback) {callback(['ip', 'host', 'tag', 'group'])},
+                valueMatches : function(facet, searchTerm, callback) { switch (facet) {
+                    case 'tag':
+                        callback([
+                          {% for tag in tags %}
+                            {value: '{{tag}}', label: '{{tag}}'},
+                          {%endfor%}
+                        ]);
+                        break;
+                    case 'host':
+                        callback([
+                          {% for host in hosts %}
+                            {value: '{{host}}', label: '{{host}}'},
+                          {%endfor%}
+                        ]);
+                        break;
+                    case 'group':
+                        callback([
+                          {% for group in groups %}
+                            {value: '{{group}}', label: '{{group}}'},
+                          {%endfor%}
+                        ]);
+                        break;
+                    case 'ip':
+                        callback([
+                          {% for ip in ips %}
+                            {value: '{{ip}}', label: '{{ip}}'},
+                          {%endfor%}
+                        ]);
+                        break;
+                                        }
+                }
+              }
+            });
+          });
+        </script>
+        <input type="hidden" value="{{key}}"/>
+  </body>
+</html>
