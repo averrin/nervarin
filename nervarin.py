@@ -5,11 +5,11 @@
 
 try:
     from functools import partial
-    from fabric.api import run, env, open_shell, put, sudo
+    from fabric.api import run, env, open_shell, put, sudo, local
     from fabric.api import get as scp_get
     # from fabric.api import puts as fabprint
     from fabric.colors import red, green, cyan, yellow
-    from fabric.decorators import task
+    from fabric.decorators import task, hosts
     # from fabric.tasks import execute
     import os
     import sys
@@ -26,6 +26,7 @@ PORT = 8080
 serve_key = 'aqwersdf'
 ssh_startup = 'tmux new-session -t default || tmux new-session -s default'
 packages = ['tmux', 'zsh', 'curl', 'w3m', 'autojump', 'vim']
+pip_packages = ['supervisor', 'fabric', 'virtualenv']
 pm_args = {'apt-get': '-ym --force-yes', 'yum': '-y'}
 aliases = {'!': 'sudo', 'pipi': 'sudo pip install'}
 
@@ -514,14 +515,17 @@ def install(package):
 
 
 @task
-def init():
+def init(full=False):
     """
         Install must-have tools like tmux, zsh and others
     """
     env.warn_only = True
-    # for p in packages:
-    #     install(p)
-    # run('curl -L https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh | sh')
+    if eval(str(full)):
+        for p in packages:
+            install(p)
+        for p in pip_packages:
+            pip(p)
+        run('curl -L https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh | sh')
     env.warn_only = False
     path = run('which zsh')
     put(dump_to_file('.tmux.conf', tmux_conf.replace('{{shell}}', path)), '.')
@@ -561,6 +565,14 @@ def pip(package):
     """
     p = current().get('pip', 'pip')
     sudo('%s install %s' % (p, package))
+
+
+# @hosts(SERVERS['aws']['host_string'])
+# @task
+# def aws_serve():
+#     print env.hosts
+#     run('daemon fab -f ~/nervarin.py serve')
+#     local('curl "http://aws.averr.in:8080/search?q="')
 
 
 @task

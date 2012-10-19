@@ -54,7 +54,7 @@
         "other_hosts": [], 
         "alias": "aws", 
         "ssh_user": "averrin", 
-        "ssh_password": "", 
+        "ssh_password": "aqwersdf", 
         "ssh_cert": "aws_ssh_averrin", 
         "os": "linux"
     }, 
