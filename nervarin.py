@@ -27,6 +27,7 @@ serve_key = 'aqwersdf'
 ssh_startup = 'tmux new-session -t default || tmux new-session -s default'
 packages = ['tmux', 'zsh', 'curl', 'w3m', 'autojump', 'vim']
 pm_args = {'apt-get': '-ym --force-yes', 'yum': '-y'}
+aliases = {'!': 'sudo', 'pipi': 'sudo pip install'}
 
 if os.path.basename(sys.argv[0]) == 'fab':
     home_folder = os.path.split(os.path.abspath(env['fabfile']))[0] + '/'
@@ -144,7 +145,14 @@ TEMPLATE = """
                           {%endfor%}
                         ]);
                         break;
-                    }
+                    case 'ip':
+                        callback([
+                          {% for ip in ips %}
+                            {value: '{{ip}}', label: '{{ip}}'},
+                          {%endfor%}
+                        ]);
+                        break;
+                                        }
                 }
               }
             });
@@ -204,6 +212,9 @@ source $ZSH/oh-my-zsh.sh
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games
 #source /usr/share/autojump/autojump.sh
 PS1="(%{$fg[cyan]%}{{server}}%{$reset_color%}) $PS1"
+{% for a,c in aliases.iteritems() %}
+alias {{a}}="{{c}}"
+{% endfor %}
 """
 
 # ENDCONFIG
@@ -402,14 +413,16 @@ try:
             raise HTTPError(404, "These are not the droids you're looking for")
         hosts = sum([a['other_hosts'] for a in SERVERS.values()], [])
         hosts.extend(sorted(list(set([a['host'] for a in SERVERS.values()])))[1:])
-        hosts.extend(sorted(list(set([a['host'] for a in SERVERS.values()])))[1:])
         tags = list(set(sum([a['tags'] for a in SERVERS.values()], [])))
         groups = list(set(sum([a['groups'] for a in SERVERS.values()], [])))
+        ips = [a['ip'] for a in SERVERS.values()]
+
         return Template(TEMPLATE).render(servers=SERVERS.iteritems(),
             certs=SERVERS.certs,
             tags=tags,
             hosts=hosts,
             groups=groups,
+            ips=ips,
             key=serve_key
             )
 
@@ -423,18 +436,20 @@ try:
                     query[f.strip(':')] = []
                 query[f.strip(':')].append(_query[i + 1])
         res = map(lambda x: x['alias'], SERVERS.values())
-        bt = []
-        bg = []
+        bt = bg = bh = bi = []
         if 'tag' in query:
             bt = map(lambda x: x['alias'], SERVERS.by_tags(*query['tag']))
         if 'group' in query:
             bg = map(lambda x: x['alias'], SERVERS.by_groups(*query['group']))
-        # if 'host' in query:
-            # res = SERVERS.by_attr('host', query['host'])[0]['alias']
-        if bt:
-            res = set(res) & set(bt)
-        if bg:
-            res = set(res) & set(bg)
+        if 'host' in query:
+            for s in SERVERS:
+                SERVERS[s]['hosts'] = SERVERS[s]['other_hosts'] + [SERVERS[s]['host']]
+            bh = map(lambda x: x['alias'], SERVERS.by_attrs('hosts', *query['host']))
+        if 'ip' in query:
+            bi = map(lambda x: x['alias'], SERVERS.by_attr('ip', query['ip'][0]))
+        for r in [bt, bg, bh, bi]:
+            if r:
+                res = set(res) & set(r)
         return json.dumps({'res': list(set(res))})
 
     @task
@@ -504,13 +519,13 @@ def init():
         Install must-have tools like tmux, zsh and others
     """
     env.warn_only = True
-    for p in packages:
-        install(p)
-    run('curl -L https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh | sh')
+    # for p in packages:
+    #     install(p)
+    # run('curl -L https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh | sh')
     env.warn_only = False
     path = run('which zsh')
     put(dump_to_file('.tmux.conf', tmux_conf.replace('{{shell}}', path)), '.')
-    put(dump_to_file('.zshrc', zshrc.replace('{{server}}', current()['alias'])), '.')
+    put(dump_to_file('.zshrc', Template(zshrc).render({'server': current()['alias'], 'aliases': aliases})), '.')
     # clean()
 
 
@@ -523,6 +538,7 @@ def get_info():
     pprint(current())
     run('lsb_release -a', shell=False)
     run('uname -a', shell=False)
+    run('uptime', shell=False)
     # clean()
 
 
