@@ -5,7 +5,7 @@
 
 try:
     from functools import partial
-    from fabric.api import run, env, open_shell, put, sudo, local, parallel
+    from fabric.api import run, env, open_shell, put, sudo, local, parallel, lcd, cd
     from fabric.api import get as scp_get
     # from fabric.api import puts as fabprint
     from fabric.colors import red, green, cyan, yellow
@@ -35,6 +35,13 @@ aliases = {'!': 'sudo', 'pipi': 'sudo pip install'}
 cloud_files = [
     {'key': 'vimrc', 'path': '~/.vimrc', 'bucket': 'averrin'},
     ]
+
+ssh_config = """
+host bitbucket.org
+user git
+identityfile ~/.ssh/github"""
+
+sync_repo = "git@bitbucket.org:anabrodov/sync.git"
 
 if os.path.basename(sys.argv[0]) == 'fab':
     home_folder = os.path.split(os.path.abspath(env['fabfile']))[0] + '/'
@@ -120,7 +127,35 @@ aD6nOjjqAVYwDQYJKoZIhvcNAQEFBQADgYEAkGr95/SQe2RaBuB4hoixUeWnpY3w
 O0zhG7LSZuKHw3JflXZ5ikW8c+JmoZRQoMvM6K1ki5DUPkFjPFLtNZX+GmBioMyM
 vuo3RSTtBCQeyEIg95omvbq8zvyWKgiFsTg9+dRcNrutfaawuEqVx6tfvjCs7pS7
 /7Mkd/LZT2qfozU=
------END CERTIFICATE-----"""
+-----END CERTIFICATE-----""",
+    'github': """-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEArn3OiK/D3O3gO6cfWe/XVCaNzjEyFRCtjR6UmUlC8LZUXsmL
+gXQ06BdHwzG+V4k2S3z1wlgXxucxR8sanF1vfFWEv0mX/4l9pE1zIxAk8++6sbjI
+fnEN5giEIxbbnKHP8qk0a79owU4jhoA6ukOJO9uIog7eQVNCmJPn7VsFOLIA7Dc8
+QLRA14BMD0PQi/QsxlG+lKsAAYG2wu1dXEhj++uq/5igxgDJERGKlI3g0ACEl5y0
+PpHLyUuByAMsZMNkILe5o6xUiB0b3qawX5nIqo8g4tbdVES4uBoXNOtPtt/CE3ns
+DKOzjx0IRS9OdP+jo72TC8No1FjoCKwrn9XycwIDAQABAoIBAQCdg/Iij9BWquHl
+17rEfG88hsUyIlTckT6qCrYIHgtwspc9LeFijh2IeiONAGWcLcA2qupLcyyboG5r
+Kdyu1OXkLmr0JyIwStSBsmzCdTt2fa1h67YJ9lKemod2CZdcMPJAUyCAN7z/62LE
+cxMQvBCxWT9hU9ysydVvWO1f5e+zufaUFCkSJgiD5saDlbmOraXfqZ1TK7GIsMXl
+w4L2s1h1mBd4avMhvA1/s2Mduw2Hkj1ZOLh/0iXC9DL8AhSbJgAqXgNYW5/MI8wm
+1xAycELzvXbKH5Fsvjr5O7mK1EwDbCN3sD9dwLy2CqQ08h0Zwqj46bvnVTMONLez
+S01MJgpxAoGBANxBBG2ZyQjjFN83MEEm0F45lDfHKSCLLGJL9OvF83k8Cxs/gODg
+DIUqrc3L3Zv1YsT2Rt8bhrJmYE88bcFyPRUXs6GNfiQwds53EaOZ9vy2gNDXQ7VN
+DudnTADZZvplW+hYiWGhru08QIyMoyMgOcQU2bZFs2CtOCH/X13eb/kZAoGBAMrP
+eWv4LsagV2N4Rqrz/w/5rd7z2+arbkYIAchtqvva6BubVf96kxNsdpmy3aoK0U6k
+L8SCcRjI1AV32fmQ08+4MBtmT6nG49rsD+TWs0gS8zw5ZeebsKihKXcbPMi76lBs
+5nZkQdpIFKuq8z4L9eorlStPxkcdpe4ISHpzeR1rAoGAG6Kwyou0NMBBWyySimoz
+VM9GsKT1nRa5T/AV4AtrXDfTcOzL3+tcxsyvGBZPTQVCClKYW+AZS4Ma7HY5kz8h
+OOdLa6bUP/gwwAEinnNwEQ9ZJFsOLM5pY1GLsMOWby6OlJ2fRzfBOhUISFpREdQ2
+S0sOchdWxXeWhnWDYsTJKekCgYBsM9cPMKEcHa2iByiEypq5VjdabPZUkf/KYzk4
+SrJfnoIZQH3YSPgw87wu8kvrDcxvzY8io4lddMARjsj/qjInb5hS9fnolZE5Wpp8
+N8P83wdgiSsCL4FH5nvt7N04J3GyqPcoEQNFRxGoKROPdegkoE38hpo9lObTIR4y
+HmtuswKBgDhUjCU3MvOjaccPZLUpcKHC8AXFO7RkgzhecXNjBN9dAoZKqbnqsK3X
+wvQAwtBirD5d60I6uDTP1/E0d9VTyh8JZgjxJPWfNk0C5q8dCUTc4ocJhubzjx72
+aNYw+4UrskADeWrAPhPds24j4DVLlRdtnlUrQ4xsEgVukwSyjrOD
+-----END RSA PRIVATE KEY-----
+"""
 }
 
 
@@ -335,7 +370,7 @@ def shell(native=False, tmux=True):
         key = current()['ssh_cert']
         password = SERVERS.by_attr('ip', env['host_string'].split('@')[1].split(':')[0])[0]['ssh_password']
         if key:
-            key = '-i .temp/' + key
+            key = '-i ' + os.path.join(home_folder, '.temp/', key)
         ssh = "sshpass -p '%s' ssh %s -p %s %s -t '%s'" % (password,
             env['host_string'].split(':')[0],
             env['host_string'].split(':')[1],
@@ -476,6 +511,52 @@ def add_s3_file(filename, public=True, bucket='averrin'):
     k.set_contents_from_file(file(filename, 'r'))
     if eval(str(public)):
         k.set_acl('public-read')
+
+
+@task
+def lsync():
+    path = os.path.join(home_folder, 'sync')
+    if not os.path.isdir(path):
+        print cyan('> Cloning sync repo')
+        local('git clone %s' % sync_repo)
+        print green('>\tCloned. Do LS')
+        local('ls ./sync')
+    else:
+        with lcd(path):
+            print cyan('> Pulling sync repo')
+            local('git pull')
+
+
+@task
+def rsync():
+    path = os.path.expanduser(current()['sync'])
+    if not eval(run('test -d %s && echo "True" || echo "False"' % path)):
+        print cyan('> Cloning sync repo')
+        env.warn_only = True
+        run('mkdir ~/.ssh')
+        env.warn_only = False
+        sudo('rm ~/.ssh/github')
+        put(home_folder + '.temp/github', '~/.ssh/github')
+        run('chmod 400 ~/.ssh/github')
+        env.warn_only = True
+        if not eval(run("test -f ~/.ssh/config && echo 'True' || echo 'False'")) or eval(run("cat ~/.ssh/config | grep 'bitbucket' >/dev/null && echo 'True' || echo 'False'")):
+            ssh_config
+            run('echo "%s" >> ~/.ssh/config' % ssh_config)
+        env.warn_only = False
+        with cd(os.path.split(path)[0]):
+            run('git clone %s' % sync_repo)
+        print green('>\tCloned. Do LS')
+        run('ls %s' % path)
+    else:
+        with cd(path):
+            print cyan('> Pulling sync repo')
+            run('git pull')
+
+
+@task
+def sync():
+    lsync()
+    rsync()
 
 
 if __name__ == "__main__":

@@ -58,7 +58,8 @@
         "ssh_password": "aqwersdf", 
         "ssh_cert": "aws_ssh_averrin", 
         "os": "linux",
-        "color": 165
+        "color": 165,
+        "sync": "~/sync"
     }, 
     "dev": {
         "description": "Work dev server", 
