@@ -27,7 +27,7 @@
         "ssh_cert": "", 
         "os": "linux",
         "color": 251
-    }, 
+    },
     "aws": {
         "description": "Amazon cloud server", 
         "tags": [

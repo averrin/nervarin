@@ -1,6 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+"""
+    Fabric and boto based server admins tool
+"""
+
+"""
+    TODO: evernote
+    TODO: more s3 bucket control (uploads)
+"""
+
+__author__ = "Alexey 'Averrin' Nabrodov <averrin@gmail.com>"
+__version__ = '1.0.0'
+
 #MODULES
 
 try:
@@ -17,9 +29,10 @@ try:
     import json
     import boto
     from boto.s3.key import Key
+    from jinja2 import Template
 except ImportError:
     print 'Plz install deps:'
-    print '>\tsudo pip install fabric bottle boto'
+    print '>\tsudo pip install fabric bottle boto jinja2'
     exit(1)
 
 
@@ -51,7 +64,7 @@ else:
     home_folder = os.path.split(os.path.abspath(sys.argv[0]))[0] + '/'
 
 remote_folder = '.'
-central_server = '-i .temp/aws_ssh_averrin averrin@aws.averr.in'
+central_server = '-i .temp/aws_ssh_averrin averrin@aws.averr.in'  # TODO: split to vars
 new_server = {
         "description": "",
         "tags": [],
@@ -67,6 +80,10 @@ new_server = {
         "ssh_cert": "",
         "os": "linux"
     }
+
+# TODO: evernote tasks
+evernote_key = 'averrin'
+evernote_secret = '73dda0e225316788'
 
 # ENDCONFIG
 
@@ -298,7 +315,6 @@ for s in SERVERS.values():
 try:
     from bottle import route, request, HTTPError
     from bottle import run as server_run
-    from jinja2 import Template
 
     @route('/')
     def dump():
@@ -353,7 +369,7 @@ try:
         server_run(host='0.0.0.0', port=PORT, reloader=True, server='twisted')
 
 except:
-    print red('Serve not supported. Need Bottle and Jinja2')
+    print red('Serve not supported. Need Bottle and twisted')
 
 
 # FABRIC LOGIC
@@ -414,6 +430,7 @@ def init(full=False):
     """
         Install must-have tools like tmux, zsh and others
     """
+    s = current()
     env.warn_only = True
     if eval(str(full)):
         print cyan('> Perfom full init')
@@ -427,13 +444,12 @@ def init(full=False):
     path = run('which zsh')
     put(dump_to_file('.tmux.conf', get_s3_var('tmux.conf').replace('{{shell}}', path)), '.')
     put(dump_to_file('.zshrc', Template(
-        get_s3_var('zshrc')).render({
-            'server': current()['alias'],
-            'aliases': aliases,
-            'color': current().get('color', None)
-            })), '.')
+        get_s3_var('zshrc')).render({'s': s,
+            'aliases': aliases})), '.')
     for cf in cloud_files:
         run('wget "https://s3.amazonaws.com/%(bucket)s/%(key)s" -O %(path)s' % cf)
+    run('git config --global user.email "averrin@gmail.com"')
+    run('git config --global user.name "Alexey Nabrodov"')
     # clean()
 
 
@@ -516,41 +532,67 @@ def add_s3_file(filename, public=True, bucket='averrin'):
 @task
 def lsync():
     path = os.path.join(home_folder, 'sync')
+    print cyan('> Run local sync')
     if not os.path.isdir(path):
-        print cyan('> Cloning sync repo')
-        local('git clone %s' % sync_repo)
-        print green('>\tCloned. Do LS')
-        local('ls ./sync')
+        print cyan('>\tCloning sync repo')
+        with lcd(home_folder):
+            local('git clone %s' % sync_repo)
+            print green('>\tClonned. Do LS')
+            local('ls ./sync')
     else:
         with lcd(path):
-            print cyan('> Pulling sync repo')
+            print cyan('>\tPulling sync repo')
             local('git pull')
+            s = local('git status -s', capture=True)
+            if s:
+                s = list(set([a if a[0] in 'AM' else None for a in s.split('\n')]))[-1]
+                if s is not None:
+                    print yellow('>\tHave changes, commiting')
+                    local('git commit -am "sync"')
+                    local('git push')
+                    rsync()
+    print green('> Local synced')
 
 
 @task
 def rsync():
-    path = os.path.expanduser(current()['sync'])
-    if not eval(run('test -d %s && echo "True" || echo "False"' % path)):
-        print cyan('> Cloning sync repo')
-        env.warn_only = True
-        run('mkdir ~/.ssh')
-        env.warn_only = False
-        sudo('rm ~/.ssh/github')
-        put(home_folder + '.temp/github', '~/.ssh/github')
-        run('chmod 400 ~/.ssh/github')
-        env.warn_only = True
-        if not eval(run("test -f ~/.ssh/config && echo 'True' || echo 'False'")) or eval(run("cat ~/.ssh/config | grep 'bitbucket' >/dev/null && echo 'True' || echo 'False'")):
-            ssh_config
-            run('echo "%s" >> ~/.ssh/config' % ssh_config)
-        env.warn_only = False
-        with cd(os.path.split(path)[0]):
-            run('git clone %s' % sync_repo)
-        print green('>\tCloned. Do LS')
-        run('ls %s' % path)
+    s = current()
+    if 'sync' in s:
+        print cyan('> Run remote sync')
+        path = os.path.expanduser(s['sync'])
+        if not eval(run('test -d %s && echo "True" || echo "False"' % path)):
+            print cyan('>\tCloning sync repo')
+            env.warn_only = True
+            run('mkdir ~/.ssh')
+            env.warn_only = False
+            sudo('rm ~/.ssh/github')
+            put(home_folder + '.temp/github', '~/.ssh/github')
+            run('chmod 400 ~/.ssh/github')
+            env.warn_only = True
+            if not eval(run("test -f ~/.ssh/config && echo 'True' || echo 'False'")) or eval(run("cat ~/.ssh/config | grep 'bitbucket' >/dev/null && echo 'True' || echo 'False'")):
+                ssh_config
+                run('echo "%s" >> ~/.ssh/config' % ssh_config)
+            env.warn_only = False
+            with cd(os.path.split(path)[0]):
+                run('git clone %s %s' % (sync_repo, path))
+            print green('>\tClonned. Do LS')
+            run('ls %s' % path)
+            sudo('rm ~/.ssh/github')
+        else:
+            with cd(path):
+                print cyan('>\tPulling sync repo')
+                run('git pull')
+                s = run('git status -s')
+                if s:
+                    s = list(set([a if a[0] in 'AM' else None for a in s.split('\n')]))[-1]
+                    if s is not None:
+                        print yellow('>\tHave changes, commiting')
+                        run('git commit -am "sync"')
+                        run('git push')
+                        lsync()
+        print green('> Remote synced')
     else:
-        with cd(path):
-            print cyan('> Pulling sync repo')
-            run('git pull')
+        print yellow('> Sync not available for %s' % s['alias'])
 
 
 @task
