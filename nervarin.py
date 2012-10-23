@@ -6,8 +6,8 @@
 """
 
 """
-    TODO: evernote
-    TODO: more s3 bucket control (uploads)
+    TODO: evernote [http://habrahabr.ru/company/evernote/blog/57807/]
+    TODO: more s3 bucket control (folder uploads, non public transfers)
 """
 
 __author__ = "Alexey 'Averrin' Nabrodov <averrin@gmail.com>"
@@ -30,6 +30,7 @@ try:
     import boto
     from boto.s3.key import Key
     from jinja2 import Template
+    import imp
 except ImportError:
     print 'Plz install deps:'
     print '>\tsudo pip install fabric bottle boto jinja2'
@@ -40,13 +41,14 @@ except ImportError:
 PORT = 8080
 serve_key = 'aqwersdf'
 ssh_startup = 'TERM=xterm-256color tmux new-session -t default || TERM=xterm-256color tmux new-session -s default'
-packages = ['tmux', 'zsh', 'curl', 'w3m', 'autojump', 'vim']
+packages = ['tmux', 'zsh', 'curl', 'w3m', 'autojump', 'vim', 'wget']
 pip_packages = ['supervisor', 'fabric', 'virtualenv']
 pm_args = {'apt-get': '-ym --force-yes', 'yum': '-y'}
-aliases = {'!': 'sudo', 'pipi': 'sudo pip install'}
+aliases = {'!': 'sudo', 'pipi': 'sudo pip install', 'p': "sudo python ~/p.py"}
 
-cloud_files = [
+cloud_files = [  # Must be public
     {'key': 'vimrc', 'path': '~/.vimrc', 'bucket': 'averrin'},
+    {'key': 'p_py', 'path': '~/p.py', 'bucket': 'averrin'},
     ]
 
 ssh_config = """
@@ -55,6 +57,7 @@ user git
 identityfile ~/.ssh/github"""
 
 sync_repo = "git@bitbucket.org:anabrodov/sync.git"
+projects_repo = "git@bitbucket.org:anabrodov/projects.git"
 
 if os.path.basename(sys.argv[0]) == 'fab':
     home_folder = os.path.split(os.path.abspath(env['fabfile']))[0] + '/'
@@ -599,6 +602,58 @@ def rsync():
 def sync():
     lsync()
     rsync()
+
+
+# PROJECTS
+def load_module(name, path):
+    (file, pathname, description) = imp.find_module(name, [path])
+    return imp.load_module(name, file, pathname, description)
+
+
+def find_modules(path):
+    modules = set()
+    for filename in os.listdir(path):
+        module = None
+        if filename.endswith(".py"):
+            module = filename[:-3]
+        elif filename.endswith(".pyc"):
+            module = filename[:-4]
+        if module is not None:
+            modules.add(module)
+    return list(modules)
+
+
+def load_projects():
+    path = os.path.join(home_folder, 'projects')
+    if not os.path.isdir(path):
+        with lcd(home_folder):
+            local('git clone %s' % projects_repo)
+    sys.path.append(path)
+    from base import Project
+    projects = {}
+    _modules = [load_module(name, path) for name in find_modules(path)]
+
+    for module in _modules:
+        for obj in module.__dict__.values():
+            try:
+                if issubclass(obj, Project):
+                    projects[obj.definition['title']] = obj
+            except TypeError:
+                pass
+    return projects
+
+
+@task
+def install_project(project_name):
+    print cyan('> Installing project "%s"' % project_name)
+    projects = load_projects()
+    project = projects[project_name]()
+    project.install()
+    project.start()
+    if project.check():
+        print green('>\tProject "%s" installed' % project_name)
+    else:
+        print red('>\tCheck failed=(')
 
 
 if __name__ == "__main__":

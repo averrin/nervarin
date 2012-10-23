@@ -155,7 +155,8 @@
         "ssh_user": "nabrodov", 
         "ssh_password": "aqwersdf", 
         "ssh_cert": "", 
-        "os": "linux"
+        "os": "linux",
+        "pm": "yum"
     }, 
     "rtrs_win": {
         "description": "Moscow server windows (Emercom 2.0)", 
