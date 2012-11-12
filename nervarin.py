@@ -11,7 +11,7 @@
 """
 
 __author__ = "Alexey 'Averrin' Nabrodov <averrin@gmail.com>"
-__version__ = '1.0.0'
+__version__ = '1.0.8'
 
 #MODULES
 
@@ -19,10 +19,8 @@ try:
     from functools import partial
     from fabric.api import run, env, open_shell, put, sudo, local, parallel, lcd, cd
     from fabric.api import get as scp_get
-    # from fabric.api import puts as fabprint
     from fabric.colors import red, green, cyan, yellow
-    from fabric.decorators import task, hosts
-    # from fabric.tasks import execute
+    from fabric.decorators import task
     import os
     import sys
     import shutil
@@ -31,6 +29,7 @@ try:
     from boto.s3.key import Key
     from jinja2 import Template
     import imp
+    import urllib
 except ImportError:
     print 'Plz install deps:'
     print '>\tsudo pip install fabric bottle boto jinja2'
@@ -41,7 +40,7 @@ except ImportError:
 PORT = 8080
 serve_key = 'aqwersdf'
 ssh_startup = 'TERM=xterm-256color tmux new-session -t default || TERM=xterm-256color tmux new-session -s default'
-packages = ['tmux', 'zsh', 'curl', 'w3m', 'autojump', 'vim', 'wget']
+packages = ['git-core', 'tmux', 'zsh', 'curl', 'w3m', 'autojump', 'vim', 'wget', 'python-dev', 'htop']
 pip_packages = ['supervisor', 'fabric', 'virtualenv']
 pm_args = {'apt-get': '-ym --force-yes', 'yum': '-y'}
 aliases = {'!': 'sudo', 'pipi': 'sudo pip install', 'p': "sudo python ~/p.py"}
@@ -68,6 +67,9 @@ else:
 
 remote_folder = '.'
 central_server = '-i .temp/aws_ssh_averrin averrin@aws.averr.in'  # TODO: split to vars
+
+servers_url = 'http://averr.in:8080/json?%s' % serve_key
+
 new_server = {
         "description": "",
         "tags": [],
@@ -175,6 +177,34 @@ HmtuswKBgDhUjCU3MvOjaccPZLUpcKHC8AXFO7RkgzhecXNjBN9dAoZKqbnqsK3X
 wvQAwtBirD5d60I6uDTP1/E0d9VTyh8JZgjxJPWfNk0C5q8dCUTc4ocJhubzjx72
 aNYw+4UrskADeWrAPhPds24j4DVLlRdtnlUrQ4xsEgVukwSyjrOD
 -----END RSA PRIVATE KEY-----
+""",
+    'dev_key': """-----BEGIN RSA PRIVATE KEY-----
+MIIEogIBAAKCAQEAt76w/1IqChDhVieHlwFVX20Ssx+LiMiSf8xDkeiUBanbmSOp
+1If7mkNEm9uVX92RETsWRWvUyVii2di5eo1TC7OPSq26nsFhSon923zjGA6R7Y2w
+4m0fbNbJyTOjl6pTb26otQYm/JE/rJKTXxGLyhBsJZqa1DJZrIcqRMb6Okpmb6Nr
+FtWz7hv0uncFxDT8ZKBlr1vqqQgyfgqnI0QNvGqyKb2Zjx9rGoE1Tg83F72C8z8L
+pFSqxzm+bM3P6ZKM3yMvzyiNG14lKdnls9osM1r31ROUXFv0tofoebx+JN83lso1
+2yAP5f0KwZPVsUgr91CgoVHmJvS6BblbambZsQIDAQABAoIBAAMTXREZBf0fJTZ0
++O8NJamwQLTg3UwP12vuNl9V3kxt+HAKycf18r81Swu01D5Dji8Upx3IXUp1glxV
+JV2oyfATNF3SpKINqJw/zREEeSSo8cZhLcnMe88tlTkZ9S4Pus/NsWM+VB68K62u
+0mqv94ANYFIM0XSl1xxtMsbt8bhSCTsgI7WD8pFU9iBMvqqncJ/6EYVKdOK7zqK2
+1SunbzVju/GwRH89jyuNGhWBDYYl1ngJ+Wf5z5nuucHHY9l2oMqcGKcphBraYf6x
+EGlQ1C+S6oeq3ElBWkWDWD1SKXkzCuL2+1ou5Fzj0MWiKkA9Lq1BhteERRn/Nc8d
+tT9yp5UCgYEA4Di7rem3myYGLiquaX9pxZXGNeT57di7cOe1iHmuCgJ6n/yHrnsw
+p5WdcM1yrjzt+igqWaUGFjlBWCwRampPfuxUYMzgqjp+ab6rJujEhDZyIgz847py
+rbSg8gqZSrBkGsd8QLNPUkqf2P6N4NYNOXPQLoP5wI6oixbuIQVWkrMCgYEA0clf
+BsQvHOq7lyC7jMYNbJ4mnSeADN8Sy7vLdksqd0hNkm2R0f1Ig1F8ePwHaJqNHXmI
+krz7In/kZxGP6SYBa3jI6ckRN4DZAAKfM9puN6Vf04uOapipNnhOokSSVIIhA5rU
+EVqhtQX4Og7hlCZFs6L1VpFMzRZ5gEzzv5vtRAsCgYAKiL/QiOV2ZY/uxVSSYkkO
+3l2ElLBlS0RrJoex1L2nfLxUHeImAWWkyfOupAhaRUSM9yweMBGcI659PPzIehwo
+A2Rnc9iuRrc/spSJ7G+nIoO0M9YBwPW4UX8qP/M5vhXF6E9fHs2AOT9PS45Q3N2c
+MGO8e7jVIh6rAjXH2V9a3wKBgCvPN678DTKmumIHDeOKAIesRzgOZalKdGxjXUvo
+yod6a+imRQtrL1dtDuddClcH32xGUwUBvhgoSRRVEI6Jx0YgRSS9PoEuwSJFaeW0
+OcwZFvfgbu9Hzh535UPxufU375kHHj45hQd+paXKMcV0cJ3g7AcV9MnnZZwrdcOP
+1m6dAoGATzuYsuvi+FKtnnptQ6XRil1qe3OzKgrQGQK1hvo1YmM2Gtggna41Tn4e
+Pxl2EC2IPZIike8YfwZCSdFe9vo5sAJHzPrexBMNQNQHcK6QJm4/gECtJWxQD4+I
+J6S/SxX2onxV2FICjVN33F553hkO8mavAZFnfjHgkjfFJMkUB5c=
+-----END RSA PRIVATE KEY-----
 """
 }
 
@@ -242,7 +272,10 @@ class ServerList(dict):
             # execute(update_json, hosts=[central_server])
             # update_json()
             print cyan('> Servers getting from remote server')
-            os.system('scp %s:servers.json %s' % (central_server, home_folder))
+            # os.system('scp %s:servers.json %s' % (central_server, home_folder))
+            sc = urllib.urlopen(servers_url).read()
+            with file(os.path.join(home_folder, 'servers.json'), 'w') as f:
+                f.write(sc)
             print green('>\tServers got from remote server')
             self.load()
 
@@ -318,6 +351,22 @@ for s in SERVERS.values():
 try:
     from bottle import route, request, HTTPError
     from bottle import run as server_run
+    from pymongo import Connection
+
+    try:
+        db = Connection('localhost', 3002).meteor
+        sc = db.SERVERS
+
+        @route('/json')
+        def json():
+            if not serve_key in request.GET:
+                raise HTTPError(404, "These are not the droids you're looking for")
+            ret = {}
+            for s in sc.find():
+                ret[s['alias']] = dict(s)
+            return ret
+    except:
+        print red('No mongo serve.')
 
     @route('/')
     def dump():
@@ -390,11 +439,11 @@ def shell(native=False, tmux=True):
         password = SERVERS.by_attr('ip', env['host_string'].split('@')[1].split(':')[0])[0]['ssh_password']
         if key:
             key = '-i ' + os.path.join(home_folder, '.temp/', key)
-        ssh = "sshpass -p '%s' ssh %s -p %s %s -t '%s'" % (password,
+        ssh = "sshpass -p '%s' ssh %s -p %s %s %s" % (password,
             env['host_string'].split(':')[0],
             env['host_string'].split(':')[1],
             key,
-            ssh_startup if eval(str(tmux)) else '')
+            "-t '%s'" % ssh_startup if eval(str(tmux)) else '')
         os.system(ssh)
         print ssh
     clean()
@@ -428,7 +477,7 @@ def install(package):
 
 
 @task
-@parallel
+# @parallel
 def init(full=False):
     """
         Install must-have tools like tmux, zsh and others
@@ -573,7 +622,6 @@ def rsync():
             run('chmod 400 ~/.ssh/github')
             env.warn_only = True
             if not eval(run("test -f ~/.ssh/config && echo 'True' || echo 'False'")) or eval(run("cat ~/.ssh/config | grep 'bitbucket' >/dev/null && echo 'True' || echo 'False'")):
-                ssh_config
                 run('echo "%s" >> ~/.ssh/config' % ssh_config)
             env.warn_only = False
             with cd(os.path.split(path)[0]):
@@ -628,6 +676,9 @@ def load_projects():
     if not os.path.isdir(path):
         with lcd(home_folder):
             local('git clone %s' % projects_repo)
+    else:
+        with lcd(home_folder):
+            local('git pull')
     sys.path.append(path)
     from base import Project
     projects = {}
@@ -643,13 +694,26 @@ def load_projects():
     return projects
 
 
+def get_project(project_name, **kwargs):
+    return load_projects()[project_name](home_folder=home_folder, **kwargs)
+
+
 @task
-def install_project(project_name):
+def install_project(project_name, **kwargs):
     print cyan('> Installing project "%s"' % project_name)
-    projects = load_projects()
-    project = projects[project_name]()
+    project = get_project(project_name, **kwargs)
     project.install()
     project.start()
+    if project.check():
+        print green('>\tProject "%s" installed' % project_name)
+    else:
+        print red('>\tCheck failed=(')
+
+
+@task
+def check_project(project_name):
+    print cyan('> Checking project "%s"' % project_name)
+    project = get_project(project_name)
     if project.check():
         print green('>\tProject "%s" installed' % project_name)
     else:
