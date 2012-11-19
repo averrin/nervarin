@@ -19,7 +19,8 @@ try:
     from functools import partial
     from fabric.api import run, env, open_shell, put, sudo, local, parallel, lcd, cd
     from fabric.api import get as scp_get
-    from fabric.colors import red, green, cyan, yellow
+    # from fabric.colors import red, green, cyan, yellow
+    from fabulous.color import *
     from fabric.decorators import task
     import os
     import sys
@@ -36,6 +37,32 @@ except ImportError:
     print '>\tsudo pip install fabric bottle boto jinja2'
     exit(1)
 
+
+def success(msg):
+    s = bold(green(u' ✓  ') + msg)
+    print s.as_utf8
+
+
+def action(msg):
+    s = bold(cyan(u' >  ' + msg))
+    print s.as_utf8
+
+
+def error(msg):
+    s = bold(red(u' ✘  ' + msg))
+    print s.as_utf8
+
+
+def info(msg):
+    s = fg256('#eeee00', bold(u' !  ' + msg))
+    print s.as_utf8
+
+
+@task
+def test():
+    success('Servers saved on')
+    error('Servers saved on')
+    info('No local servers.json')
 
 # CONFIG
 USE_LOCAL = False
@@ -102,9 +129,10 @@ def backup_json():
     """
         Backup servers on central server
     """
-    print cyan('> Servers sending to remote server')
-    put(os.path.join(home_folder, 'servers.json'), remote_folder)
-    print green('>\tServers saved on %s' % current()['alias'])
+    if os.path.isfile(os.path.join(home_folder, 'servers.json')):
+        action('Servers sending to remote server')
+        put(os.path.join(home_folder, 'servers.json'), remote_folder)
+        success('Servers saved on %s' % current()['alias'])
 
 
 @task
@@ -112,9 +140,9 @@ def update_json():
     """
     Update servers from remote server
     """
-    print cyan('> Servers getting from remote server')
+    action('Servers getting from remote server')
     scp_get('servers.json', home_folder)
-    print green('>\tServers got from remote server')
+    success('Servers got from remote server')
 
 
 class ServerList(dict):
@@ -125,7 +153,7 @@ class ServerList(dict):
         self.by_groups = partial(self.by_attrs, 'groups')
         self.by_projects = partial(self.by_attrs, 'projects')
         self.by_hosts = partial(self.by_attrs, 'other_hosts')
-        print green('>\tServers loaded')
+        success('Servers loaded')
 
     def by_attrs(self, key, *values):
         res = []
@@ -151,14 +179,14 @@ class ServerList(dict):
 
     def load(self):
         if os.path.isfile(os.path.join(home_folder, 'servers.json')):
-            print cyan('> Local servers.json existed')
+            action('Local servers.json existed')
             with file(os.path.join(home_folder, 'servers.json'), 'r') as f:
                 self.update(json.loads(f.read()))
         else:
-            print yellow('> No local servers.json')
+            info('No local servers.json')
             # execute(update_json, hosts=[central_server])
             # update_json()
-            print cyan('> Servers getting from remote server')
+            action('Servers getting from remote server')
             # os.system('scp %s:servers.json %s' % (central_server, home_folder))
             req = urllib2.Request(servers_url % 'SERVERS')
             req.add_header('X-Auth-Token', api_token)
@@ -166,7 +194,7 @@ class ServerList(dict):
             if USE_LOCAL:
                 with file(os.path.join(home_folder, 'servers.json'), 'w') as f:
                     f.write(sc)
-                print green('>\tServers got from remote server')
+                success('Servers got from remote server')
                 self.load()
             else:
                 ss = {}
@@ -196,10 +224,10 @@ def get_bucket(bucket):
 
 
 def get_s3_var(filename, bucket='averrin'):
-    print cyan('> Servers getting file from S3')
+    action('Servers getting file from S3')
     b = get_bucket(bucket)
     k = b.get_key(filename)
-    print green('>\tServers got %s from S3' % filename)
+    success('Servers got %s from S3' % filename)
     return k.get_contents_as_string()
 
 
@@ -253,10 +281,10 @@ def shell(native=False, tmux=True):
         Open common ssh shell
     """
     if native or eval(str(native)):
-        print cyan('> Opening native fabric shell')
+        action('Opening native fabric shell')
         open_shell(ssh_startup if eval(str(tmux)) else '')
     else:
-        print cyan('> Opening ssh shell')
+        action('Opening ssh shell')
         key = current()['ssh_cert']
         password = SERVERS.by_attr('ip', env['host_string'].split('@')[1].split(':')[0])[0]['ssh_password']
         if key:
@@ -307,14 +335,14 @@ def init(full=False):
     s = current()
     env.warn_only = True
     if eval(str(full)):
-        print cyan('> Perfom full init')
+        action('Perfom full init')
         for p in packages:
             install(p)
         for p in pip_packages:
             pip(p)
         run('curl -L https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh | sh')
     env.warn_only = False
-    print cyan('Renew configs')
+    action('Renew configs')
     path = run('which zsh')
     put(dump_to_file('.tmux.conf', get_s3_var('tmux.conf').replace('{{shell}}', path)), '.')
     put(dump_to_file('.zshrc', Template(
@@ -332,12 +360,12 @@ def get_info():
     """
         Get server info
     """
-    print cyan('> Getting server info')
+    action('Getting server info')
     import pprint
     # from pygments import highlight
     # from pygments.lexers import JSONLexer
     # from pygments.formatters import Terminal256Formatter
-    # print green('>\t"%s" server info' % current()['alias'])
+    # print green(u'>\t"%s" server info' % current()['alias'])
     # print highlight(pprint.pformat(current()), JSONLexer(), Terminal256Formatter())
     pprint.pprint(current())
     env.warn_only = True
@@ -353,11 +381,11 @@ def full_backup():
     """
         Backup servers and this file on central server
     """
-    print cyan('> Performing full backup')
+    action('Performing full backup')
     backup_json()
-    print cyan('> Nervarin sending to remote server')
+    action('Nervarin sending to remote server')
     put(env['fabfile'], remote_folder)
-    print green('>\tNervarin saved on %s' % current()['alias'])
+    success('tNervarin saved on %s' % current()['alias'])
 
 
 @task
@@ -376,10 +404,6 @@ def pip(package):
 #     run('daemon fab -f ~/nervarin.py serve')
 #     local('curl "http://aws.averr.in:8080/search?q="')
 
-
-@task
-def test():
-    print env
 
 
 @task
@@ -406,36 +430,36 @@ def add_s3_file(filename, public=True, bucket='averrin'):
 @task
 def lsync():
     path = os.path.join(home_folder, 'sync')
-    print cyan('> Run local sync')
+    action('Run local sync')
     if not os.path.isdir(path):
-        print cyan('>\tCloning sync repo')
+        action('\tCloning sync repo')
         with lcd(home_folder):
             local('git clone %s' % sync_repo)
-            print green('>\tClonned. Do LS')
+            success('tClonned. Do LS')
             local('ls ./sync')
     else:
         with lcd(path):
-            print cyan('>\tPulling sync repo')
+            action('\tPulling sync repo')
             local('git pull')
             s = local('git status -s', capture=True)
             if s:
                 s = list(set([a if a[0] in 'AM' else None for a in s.split('\n')]))[-1]
                 if s is not None:
-                    print yellow('>\tHave changes, commiting')
+                    info('\tHave changes, commiting')
                     local('git commit -am "sync"')
                     local('git push')
                     rsync()
-    print green('> Local synced')
+    success('Local synced')
 
 
 @task
 def rsync():
     s = current()
     if 'sync' in s:
-        print cyan('> Run remote sync')
+        action('Run remote sync')
         path = os.path.expanduser(s['sync'])
         if not eval(run('test -d %s && echo "True" || echo "False"' % path)):
-            print cyan('>\tCloning sync repo')
+            action('\tCloning sync repo')
             env.warn_only = True
             run('mkdir ~/.ssh')
             env.warn_only = False
@@ -448,24 +472,24 @@ def rsync():
             env.warn_only = False
             with cd(os.path.split(path)[0]):
                 run('git clone %s %s' % (sync_repo, path))
-            print green('>\tClonned. Do LS')
+            success('Clonned. Do LS')
             run('ls %s' % path)
             sudo('rm ~/.ssh/github')
         else:
             with cd(path):
-                print cyan('>\tPulling sync repo')
+                action('\tPulling sync repo')
                 run('git pull')
                 s = run('git status -s')
                 if s:
                     s = list(set([a if a[0] in 'AM' else None for a in s.split('\n')]))[-1]
                     if s is not None:
-                        print yellow('>\tHave changes, commiting')
+                        info('\tHave changes, commiting')
                         run('git commit -am "sync"')
                         run('git push')
                         lsync()
-        print green('> Remote synced')
+        success('Remote synced')
     else:
-        print yellow('> Sync not available for %s' % s['alias'])
+        info('Sync not available for %s' % s['alias'])
 
 
 @task
@@ -522,24 +546,24 @@ def get_project(project_name, **kwargs):
 
 @task
 def install_project(project_name, **kwargs):
-    print cyan('> Installing project "%s"' % project_name)
+    action('Installing project "%s"' % project_name)
     project = get_project(project_name, **kwargs)
     project.install()
     project.start()
     if project.check():
-        print green('>\tProject "%s" installed' % project_name)
+        success('Project "%s" installed' % project_name)
     else:
-        print red('>\tCheck failed=(')
+        error('Check failed=(')
 
 
 @task
 def check_project(project_name):
-    print cyan('> Checking project "%s"' % project_name)
+    action('Checking project "%s"' % project_name)
     project = get_project(project_name)
     if project.check():
-        print green('>\tProject "%s" installed' % project_name)
+        success('Project "%s" installed' % project_name)
     else:
-        print red('>\tCheck failed=(')
+        error('Check failed=(')
 
 
 if __name__ == "__main__":
