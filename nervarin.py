@@ -11,7 +11,7 @@
 """
 
 __author__ = "Alexey 'Averrin' Nabrodov <averrin@gmail.com>"
-__version__ = '1.0.8'
+__version__ = '1.8.2'
 
 #MODULES
 
@@ -29,7 +29,8 @@ try:
     from boto.s3.key import Key
     from jinja2 import Template
     import imp
-    import urllib
+    import urllib2
+
 except ImportError:
     print 'Plz install deps:'
     print '>\tsudo pip install fabric bottle boto jinja2'
@@ -37,6 +38,8 @@ except ImportError:
 
 
 # CONFIG
+USE_LOCAL = False
+api_token = '3d714fb7-a389-4748-a781-2f9329fbc280'
 PORT = 8080
 serve_key = 'aqwersdf'
 ssh_startup = 'TERM=xterm-256color tmux new-session -t default || TERM=xterm-256color tmux new-session -s default'
@@ -68,7 +71,7 @@ else:
 remote_folder = '.'
 central_server = '-i .temp/aws_ssh_averrin averrin@aws.averr.in'  # TODO: split to vars
 
-servers_url = 'http://averr.in:8080/json?%s' % serve_key
+servers_url = 'http://averrin.meteor.com/collectionapi/%s'
 
 new_server = {
         "description": "",
@@ -91,122 +94,6 @@ evernote_key = 'averrin'
 evernote_secret = '73dda0e225316788'
 
 # ENDCONFIG
-
-
-certs = {'aws_ssh_averrin': """-----BEGIN RSA PRIVATE KEY-----
-MIIEowIBAAKCAQEAq+moeI+se2KY00Z8FEL1cupE71y7Kvn1hkfUwX7gsg2YiAZY
-0TqJ0D784o5/kkaaYNbqPzNbey5ZtdRK6R0Yk3OhxQfG+bJq+PGrcr10q5pSq3uI
-FXRX5dB0IWh49+L/LFmu8bWKsbmPkFsE2jakROxXSJiflMnAAbzp1Ep57YFkGmJ+
-/UY9Jf7M1UT/om/KLx8CJIqKEUjiIpWwo6D/NUif7JZ8P6H5P4nxeJHQDr7giuf+
-Cs7RpI7OpWWgf6bBfY9ASPengg/KKgHfUiYlOKQFjH1kT+T+hnIVmQsRanC9xm8c
-ldoF7TxMenRmZ7jZBIDCxwIstXvZ2plf3txtjwIDAQABAoIBAAn91ZXUO+Eb9Ofq
-o9GFpsBcD0+eIx63UmbQi/QHDMYsdh4JyGW4skPRNV9xisaUpepU815i/MEnC32+
-7e+oikIfqVpLPmxKy17WpPFRQ5Opr35Z+qnMjkNEH0vFx6oYnl4UhE92Dq6Pq2Fn
-eNu560g6OER24meCZk9zjF+TSIzeLNyVG3fXaJgJlyDKnMrf6aH11fm52lhI8Iw7
-Sl7R9HYOF0/A/HWJvUwrJmIkH1H4AMKOD+h+xD4g8Ck071G/sebgdbkuseUm/idP
-BEFj1nl6HgO9oLPQWhwawDDxVBGNA0K7mmseYfOWocGqw+H90zaKdR6p6VAmzaOL
-wbgKdGECgYEA465ZxeMXQaGtD3IEDCBpdqgFpULfRqEFT8Mxb87ua8MU56+BkGSj
-pc3J9cULcgRp1AiO3DTEw4iO7t1LtwI88BRTdTGUY5jfCuuuQQFb1+Wk+yDWiFmj
-YN8fYn3/9O7yqTRlGq4JDPDPyvrnRXILFJzdYhcLqMslJqSXiV77xl8CgYEAwUuS
-+BSuP15EODh1eDaiwVsuEUzyTICk1bRsE4Y+FVxjnX/vVkeXGoY3+1h9VI7HqKp7
-6lnbw/wQHoubQSbqAm91r/Z+jAlkJD0a/YYUtjd3yF0GMwkSPQsSKKzaP9eyt8WH
-0B9G/MBvGpSv5/uLranch0HfQzBLsRqgXd9extECgYAZKpBpuyw66PAEIQopfPur
-Te8x0S501B+OLXktbqYT60BIS7H6j+U20oRcUidttucrtLZ1yK9nHZUO+g8Ab5Lk
-xppi/dP1HlSpFFvye3/3YT7XM04DTEUu0/rYHC1KmY7g/RWf2VTOxV9yhEFD/9MR
-uDUQPpPfWHUGzHKjkIgr6QKBgQClP9LZu/RrwE9aMQpcR3lFDIqJx9qthJ1nBeQP
-nQiegmm3UJRwkqufxXc+rhwXmikfDQD7DO9Q0cGGG5wTSw1sH5XhZT4ywiSWxpa4
-f1Rdo3YIGV8fanXpMfnIRF4hjmn/qiO9zb+GfY1+j/cCwI5dXYZnK+2PJ07OjhDj
-r/76wQKBgDCW4Sm8wWY50mF9T+FbHfQF7pTTPaJFWXFx2Zw01K2DErng1CeSFR2H
-t75boytqJbcb4LLn6Yc/MVHjisXqGC6vQzTLeqXacahzzYSp2zYR1TN9VM1CZVHM
-12XZZHD96R6wTIbb1kVQ8wretpUhDm/6TGAznMBYF2r2kUY4AEdg
------END RSA PRIVATE KEY-----""",
-    'aws_key': """-----BEGIN PRIVATE KEY-----
-MIICdgIBADANBgkqhkiG9w0BAQEFAASCAmAwggJcAgEAAoGBAJTX7G9vKhMVdx+GlR9OZA+k+U1y
-6w3ZYUH1zfD14j+z4/TJnpvG5qMXMDtjrTnJO2HbCL1i+SJHGIzhqUD/7YbCuJuKL7x8H0/Ser1X
-gdCNcMu3YbEkxBFUkIhqpBHalrGq/Zm+jDaCKtaD0M7Zv4zC4W5/mCtBtwA/1Hki+cVVAgMBAAEC
-gYBO63Is37diaQZBi/1znQAHH4UkYKNrM3CTJb7tXaJ5/msG9wSHOl496WSkiMRnmGBJEXc/28OX
-PjUxNdGlak3JUBL3TOy2EkVOZ4wvr2uVWPUlTqXfQRydmM72A7H3rmkv8EmdIjxb+0WAtDNuS+Rl
-Cd8Kl4MPMQmQnKMhNNV9wQJBAM459oM0c+swE5a3U9tUsX40Vq9rK3ywPX386CIIHNA1QJYnksGp
-ZhTy8wQtKAdzr2kE4baZEuJe7pbnNWYzNbECQQC4xHXGf0IPpWtNlH05dwtxuxxXAsY6vjWAPqIK
-HxbQ5V6YAslsA+2B4wqvvPnkBh7jDwxSFDntz6eWLAp84B7lAkEArT4WL4yN4MJHgnJJuNRCMyIm
-vECMjLfFQKSIIaatBd/mfP2LlLMI9YpOynBg0znE3rViJDIdohtb1VswCcX1UQJANE8acNnyX++b
-E1mooi47xTUN7uxQJq1XBDm3Mlpe4UEuqKaRU81A3nbivaIotQ+uiuXlvQ8Q32zcqz1IstXYqQJA
-Q8iG/FHuVOVc2IZkx8hHMvaRP8EP7R2RMArA5yW//XJtLwCp51oJ7NDH0PTXPzzcJTcFQzKDkD0n
-zBr5MFanRw==
------END PRIVATE KEY-----""",
-    'aws_cert': """-----BEGIN CERTIFICATE-----
-MIICdzCCAeCgAwIBAgIGAIrPIWKZMA0GCSqGSIb3DQEBBQUAMFMxCzAJBgNVBAYT
-AlVTMRMwEQYDVQQKEwpBbWF6b24uY29tMQwwCgYDVQQLEwNBV1MxITAfBgNVBAMT
-GEFXUyBMaW1pdGVkLUFzc3VyYW5jZSBDQTAeFw0xMjEwMDUxMjQzNDdaFw0xMzEw
-MDUxMjQzNDdaMFIxCzAJBgNVBAYTAlVTMRMwEQYDVQQKEwpBbWF6b24uY29tMRcw
-FQYDVQQLEw5BV1MtRGV2ZWxvcGVyczEVMBMGA1UEAxMMZDhoZmxqbzVkaXIxMIGf
-MA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCU1+xvbyoTFXcfhpUfTmQPpPlNcusN
-2WFB9c3w9eI/s+P0yZ6bxuajFzA7Y605yTth2wi9YvkiRxiM4alA/+2Gwribii+8
-fB9P0nq9V4HQjXDLt2GxJMQRVJCIaqQR2paxqv2Zvow2girWg9DO2b+MwuFuf5gr
-QbcAP9R5IvnFVQIDAQABo1cwVTAOBgNVHQ8BAf8EBAMCBaAwFgYDVR0lAQH/BAww
-CgYIKwYBBQUHAwIwDAYDVR0TAQH/BAIwADAdBgNVHQ4EFgQUxo3xUKXYAIIgBk91
-aD6nOjjqAVYwDQYJKoZIhvcNAQEFBQADgYEAkGr95/SQe2RaBuB4hoixUeWnpY3w
-O0zhG7LSZuKHw3JflXZ5ikW8c+JmoZRQoMvM6K1ki5DUPkFjPFLtNZX+GmBioMyM
-vuo3RSTtBCQeyEIg95omvbq8zvyWKgiFsTg9+dRcNrutfaawuEqVx6tfvjCs7pS7
-/7Mkd/LZT2qfozU=
------END CERTIFICATE-----""",
-    'github': """-----BEGIN RSA PRIVATE KEY-----
-MIIEowIBAAKCAQEArn3OiK/D3O3gO6cfWe/XVCaNzjEyFRCtjR6UmUlC8LZUXsmL
-gXQ06BdHwzG+V4k2S3z1wlgXxucxR8sanF1vfFWEv0mX/4l9pE1zIxAk8++6sbjI
-fnEN5giEIxbbnKHP8qk0a79owU4jhoA6ukOJO9uIog7eQVNCmJPn7VsFOLIA7Dc8
-QLRA14BMD0PQi/QsxlG+lKsAAYG2wu1dXEhj++uq/5igxgDJERGKlI3g0ACEl5y0
-PpHLyUuByAMsZMNkILe5o6xUiB0b3qawX5nIqo8g4tbdVES4uBoXNOtPtt/CE3ns
-DKOzjx0IRS9OdP+jo72TC8No1FjoCKwrn9XycwIDAQABAoIBAQCdg/Iij9BWquHl
-17rEfG88hsUyIlTckT6qCrYIHgtwspc9LeFijh2IeiONAGWcLcA2qupLcyyboG5r
-Kdyu1OXkLmr0JyIwStSBsmzCdTt2fa1h67YJ9lKemod2CZdcMPJAUyCAN7z/62LE
-cxMQvBCxWT9hU9ysydVvWO1f5e+zufaUFCkSJgiD5saDlbmOraXfqZ1TK7GIsMXl
-w4L2s1h1mBd4avMhvA1/s2Mduw2Hkj1ZOLh/0iXC9DL8AhSbJgAqXgNYW5/MI8wm
-1xAycELzvXbKH5Fsvjr5O7mK1EwDbCN3sD9dwLy2CqQ08h0Zwqj46bvnVTMONLez
-S01MJgpxAoGBANxBBG2ZyQjjFN83MEEm0F45lDfHKSCLLGJL9OvF83k8Cxs/gODg
-DIUqrc3L3Zv1YsT2Rt8bhrJmYE88bcFyPRUXs6GNfiQwds53EaOZ9vy2gNDXQ7VN
-DudnTADZZvplW+hYiWGhru08QIyMoyMgOcQU2bZFs2CtOCH/X13eb/kZAoGBAMrP
-eWv4LsagV2N4Rqrz/w/5rd7z2+arbkYIAchtqvva6BubVf96kxNsdpmy3aoK0U6k
-L8SCcRjI1AV32fmQ08+4MBtmT6nG49rsD+TWs0gS8zw5ZeebsKihKXcbPMi76lBs
-5nZkQdpIFKuq8z4L9eorlStPxkcdpe4ISHpzeR1rAoGAG6Kwyou0NMBBWyySimoz
-VM9GsKT1nRa5T/AV4AtrXDfTcOzL3+tcxsyvGBZPTQVCClKYW+AZS4Ma7HY5kz8h
-OOdLa6bUP/gwwAEinnNwEQ9ZJFsOLM5pY1GLsMOWby6OlJ2fRzfBOhUISFpREdQ2
-S0sOchdWxXeWhnWDYsTJKekCgYBsM9cPMKEcHa2iByiEypq5VjdabPZUkf/KYzk4
-SrJfnoIZQH3YSPgw87wu8kvrDcxvzY8io4lddMARjsj/qjInb5hS9fnolZE5Wpp8
-N8P83wdgiSsCL4FH5nvt7N04J3GyqPcoEQNFRxGoKROPdegkoE38hpo9lObTIR4y
-HmtuswKBgDhUjCU3MvOjaccPZLUpcKHC8AXFO7RkgzhecXNjBN9dAoZKqbnqsK3X
-wvQAwtBirD5d60I6uDTP1/E0d9VTyh8JZgjxJPWfNk0C5q8dCUTc4ocJhubzjx72
-aNYw+4UrskADeWrAPhPds24j4DVLlRdtnlUrQ4xsEgVukwSyjrOD
------END RSA PRIVATE KEY-----
-""",
-    'dev_key': """-----BEGIN RSA PRIVATE KEY-----
-MIIEogIBAAKCAQEAt76w/1IqChDhVieHlwFVX20Ssx+LiMiSf8xDkeiUBanbmSOp
-1If7mkNEm9uVX92RETsWRWvUyVii2di5eo1TC7OPSq26nsFhSon923zjGA6R7Y2w
-4m0fbNbJyTOjl6pTb26otQYm/JE/rJKTXxGLyhBsJZqa1DJZrIcqRMb6Okpmb6Nr
-FtWz7hv0uncFxDT8ZKBlr1vqqQgyfgqnI0QNvGqyKb2Zjx9rGoE1Tg83F72C8z8L
-pFSqxzm+bM3P6ZKM3yMvzyiNG14lKdnls9osM1r31ROUXFv0tofoebx+JN83lso1
-2yAP5f0KwZPVsUgr91CgoVHmJvS6BblbambZsQIDAQABAoIBAAMTXREZBf0fJTZ0
-+O8NJamwQLTg3UwP12vuNl9V3kxt+HAKycf18r81Swu01D5Dji8Upx3IXUp1glxV
-JV2oyfATNF3SpKINqJw/zREEeSSo8cZhLcnMe88tlTkZ9S4Pus/NsWM+VB68K62u
-0mqv94ANYFIM0XSl1xxtMsbt8bhSCTsgI7WD8pFU9iBMvqqncJ/6EYVKdOK7zqK2
-1SunbzVju/GwRH89jyuNGhWBDYYl1ngJ+Wf5z5nuucHHY9l2oMqcGKcphBraYf6x
-EGlQ1C+S6oeq3ElBWkWDWD1SKXkzCuL2+1ou5Fzj0MWiKkA9Lq1BhteERRn/Nc8d
-tT9yp5UCgYEA4Di7rem3myYGLiquaX9pxZXGNeT57di7cOe1iHmuCgJ6n/yHrnsw
-p5WdcM1yrjzt+igqWaUGFjlBWCwRampPfuxUYMzgqjp+ab6rJujEhDZyIgz847py
-rbSg8gqZSrBkGsd8QLNPUkqf2P6N4NYNOXPQLoP5wI6oixbuIQVWkrMCgYEA0clf
-BsQvHOq7lyC7jMYNbJ4mnSeADN8Sy7vLdksqd0hNkm2R0f1Ig1F8ePwHaJqNHXmI
-krz7In/kZxGP6SYBa3jI6ckRN4DZAAKfM9puN6Vf04uOapipNnhOokSSVIIhA5rU
-EVqhtQX4Og7hlCZFs6L1VpFMzRZ5gEzzv5vtRAsCgYAKiL/QiOV2ZY/uxVSSYkkO
-3l2ElLBlS0RrJoex1L2nfLxUHeImAWWkyfOupAhaRUSM9yweMBGcI659PPzIehwo
-A2Rnc9iuRrc/spSJ7G+nIoO0M9YBwPW4UX8qP/M5vhXF6E9fHs2AOT9PS45Q3N2c
-MGO8e7jVIh6rAjXH2V9a3wKBgCvPN678DTKmumIHDeOKAIesRzgOZalKdGxjXUvo
-yod6a+imRQtrL1dtDuddClcH32xGUwUBvhgoSRRVEI6Jx0YgRSS9PoEuwSJFaeW0
-OcwZFvfgbu9Hzh535UPxufU375kHHj45hQd+paXKMcV0cJ3g7AcV9MnnZZwrdcOP
-1m6dAoGATzuYsuvi+FKtnnptQ6XRil1qe3OzKgrQGQK1hvo1YmM2Gtggna41Tn4e
-Pxl2EC2IPZIike8YfwZCSdFe9vo5sAJHzPrexBMNQNQHcK6QJm4/gECtJWxQD4+I
-J6S/SxX2onxV2FICjVN33F553hkO8mavAZFnfjHgkjfFJMkUB5c=
------END RSA PRIVATE KEY-----
-"""
-}
 
 
 # SERVERS LOGIC
@@ -233,7 +120,7 @@ def update_json():
 class ServerList(dict):
     def __init__(self):
         self.load()
-        self.certs = certs
+        self.certs = self.load_certs()
         self.by_tags = partial(self.by_attrs, 'tags')
         self.by_groups = partial(self.by_attrs, 'groups')
         self.by_projects = partial(self.by_attrs, 'projects')
@@ -273,11 +160,25 @@ class ServerList(dict):
             # update_json()
             print cyan('> Servers getting from remote server')
             # os.system('scp %s:servers.json %s' % (central_server, home_folder))
-            sc = urllib.urlopen(servers_url).read()
-            with file(os.path.join(home_folder, 'servers.json'), 'w') as f:
-                f.write(sc)
-            print green('>\tServers got from remote server')
-            self.load()
+            req = urllib2.Request(servers_url % 'SERVERS')
+            req.add_header('X-Auth-Token', api_token)
+            sc = urllib2.urlopen(req).read()
+            if USE_LOCAL:
+                with file(os.path.join(home_folder, 'servers.json'), 'w') as f:
+                    f.write(sc)
+                print green('>\tServers got from remote server')
+                self.load()
+            else:
+                ss = {}
+                for s in json.loads(sc):
+                    ss[s['alias']] = s
+                self.update(ss)
+
+    def load_certs(self):
+        req = urllib2.Request(servers_url % 'KEYS')
+        req.add_header('X-Auth-Token', api_token)
+        sc = urllib2.urlopen(req).read()
+        return json.loads(sc)
 
 
 # ETC
@@ -319,10 +220,9 @@ def current():
 env.key_filename = []
 clean()
 os.mkdir(os.path.join(home_folder, '.temp'))
-for cert in certs:
-    env.key_filename.append(dump_to_file(cert, certs[cert], 400))
-
 SERVERS = ServerList()
+for cert in SERVERS.certs:
+    env.key_filename.append(dump_to_file(cert['title'], cert['key'].replace('\\n', '\n'), 400))
 
 for s in SERVERS:
     SERVERS[s]['alias'] = s
@@ -344,84 +244,6 @@ for s in SERVERS.values():
             env.roledefs[g].append('%(ssh_user)s@%(ip)s:%(ssh_port)s' % s)
         else:
             env.roledefs[g].append(s['ip'])
-
-
-# SERVE LOGIC
-
-try:
-    from bottle import route, request, HTTPError
-    from bottle import run as server_run
-    from pymongo import Connection
-
-    try:
-        db = Connection('localhost', 3002).meteor
-        sc = db.SERVERS
-
-        @route('/json')
-        def json():
-            if not serve_key in request.GET:
-                raise HTTPError(404, "These are not the droids you're looking for")
-            ret = {}
-            for s in sc.find():
-                ret[s['alias']] = dict(s)
-            return ret
-    except:
-        print red('No mongo serve.')
-
-    @route('/')
-    def dump():
-        if not serve_key in request.GET:
-            raise HTTPError(404, "These are not the droids you're looking for")
-        hosts = sum([a['other_hosts'] for a in SERVERS.values()], [])
-        hosts.extend(sorted(list(set([a['host'] for a in SERVERS.values()])))[1:])
-        tags = list(set(sum([a['tags'] for a in SERVERS.values()], [])))
-        groups = list(set(sum([a['groups'] for a in SERVERS.values()], [])))
-        ips = [a['ip'] for a in SERVERS.values()]
-
-        return Template(get_s3_var('nervarin.html')).render(servers=SERVERS.iteritems(),
-            certs=SERVERS.certs,
-            tags=tags,
-            hosts=hosts,
-            groups=groups,
-            ips=ips,
-            key=serve_key
-            )
-
-    @route('/search')
-    def search():
-        _query = map(lambda x: x.strip(' "'), request.GET['q'].split(' '))
-        query = {}
-        for i, f in enumerate(_query):
-            if f.endswith(':'):
-                if not f.strip(':') in query:
-                    query[f.strip(':')] = []
-                query[f.strip(':')].append(_query[i + 1])
-        res = map(lambda x: x['alias'], SERVERS.values())
-        bt = bg = bh = bi = []
-        if 'tag' in query:
-            bt = map(lambda x: x['alias'], SERVERS.by_tags(*query['tag']))
-        if 'group' in query:
-            bg = map(lambda x: x['alias'], SERVERS.by_groups(*query['group']))
-        if 'host' in query:
-            for s in SERVERS:
-                SERVERS[s]['hosts'] = SERVERS[s]['other_hosts'] + [SERVERS[s]['host']]
-            bh = map(lambda x: x['alias'], SERVERS.by_attrs('hosts', *query['host']))
-        if 'ip' in query:
-            bi = map(lambda x: x['alias'], SERVERS.by_attr('ip', query['ip'][0]))
-        for r in [bt, bg, bh, bi]:
-            if r:
-                res = set(res) & set(r)
-        return json.dumps({'res': list(set(res))})
-
-    @task
-    def serve():
-        """
-            Run web-server for html version of servers list
-        """
-        server_run(host='0.0.0.0', port=PORT, reloader=True, server='twisted')
-
-except:
-    print red('Serve not supported. Need Bottle and twisted')
 
 
 # FABRIC LOGIC
