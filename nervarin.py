@@ -31,10 +31,11 @@ try:
     from jinja2 import Template
     import imp
     import urllib2
+    from subprocess import *
 
 except ImportError:
     print 'Plz install deps:'
-    print '>\tsudo pip install fabric bottle boto jinja2'
+    print '>\tsudo pip install fabric bottle boto jinja2 fabulous'
     exit(1)
 
 
@@ -44,7 +45,7 @@ def success(msg):
 
 
 def action(msg):
-    s = bold(cyan(u' >  ' + msg))
+    s = cyan(u' >  ' + msg)
     print s.as_utf8
 
 
@@ -385,7 +386,7 @@ def full_backup():
     backup_json()
     action('Nervarin sending to remote server')
     put(env['fabfile'], remote_folder)
-    success('tNervarin saved on %s' % current()['alias'])
+    success('Nervarin saved on %s' % current()['alias'])
 
 
 @task
@@ -564,6 +565,39 @@ def check_project(project_name):
         success('Project "%s" installed' % project_name)
     else:
         error('Check failed=(')
+
+
+
+@task
+def list(ping=False):
+    pings = []
+    for s in SERVERS.values():
+        # if 'noping' not in s or not s['noping']:
+        p = {}
+        # print s['ip']
+        p['addr'] = blue(bold(' >  ')) +\
+            bold(s['alias']) +\
+            blue(bold(u' — %(description)s [' % s)) +\
+            bold(green(s['ip'])) +\
+            bold(blue(']'))
+        if 'noping' not in s or not s['noping']:
+            p['ping'] = Popen(['ping', s['ip'], '-c', '2'], stdout=PIPE, stderr=PIPE)
+        pings.append(p)
+    if eval(str(ping)):
+        action('Ping servers')
+        for s in pings:
+            print s['addr'].as_utf8
+            if 'ping' in s:
+                c = s['ping'].communicate()[0]
+                if c and c.find('100% packet loss') == -1:
+                    success('Online')
+                else:
+                    info('Offline')
+            print
+    else:
+        for s in pings:
+            print s['addr'].as_utf8
+
 
 
 if __name__ == "__main__":
