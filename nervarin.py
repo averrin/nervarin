@@ -32,6 +32,7 @@ try:
     import imp
     import urllib2
     from subprocess import *
+    import platform
 
 except ImportError:
     print 'Plz install deps:'
@@ -58,23 +59,53 @@ def info(msg):
     s = fg256('#eeee00', bold(u' !  ' + msg))
     print s.as_utf8
 
-
-@task
-def test():
-    success('Servers saved on')
-    error('Servers saved on')
-    info('No local servers.json')
-
 # CONFIG
+SERVER = 'http://averrin.meteor.com'
+# SERVER = 'http://averr.in:3002'
+API_ROOT = 'collectionapi'
+API = '%s/%s/' % (SERVER, API_ROOT)
+TOKEN = '3d714fb7-a389-4748-a781-2f9329fbc280'
+
+
+def make_request(collection):
+    url = API + collection
+    action('Get %s...' % collection)
+    req = urllib2.Request(url)
+    req.add_header('X-Auth-Token', TOKEN)
+    return urllib2.urlopen(req)
+
+get_projects = lambda: json.load(make_request('PROJECTS'))
+get_servers = lambda: json.load(make_request('SERVERS'))
+get_keys = lambda: json.load(make_request('KEYS'))
+get_users = lambda: json.load(make_request('PROFILES'))
+get_configs = lambda: json.load(make_request('CONFIGS'))
+get_clients = lambda: json.load(make_request('CLIENTS'))
+
+
+def get_profile(username):
+    users = get_users()
+    # print users
+    for user in users:
+        if user['username'] == username:
+            return user['profile']
+
+
+def get_config(title="Nervarin"):
+    clients = get_clients()
+    # print users
+    for client in clients:
+        if client['title'] == title:
+            return client
+
+config = get_config()
+if config:
+    success('Config loaded')
+else:
+    error('Cant load config')
+    exit(1)
 USE_LOCAL = False
 api_token = '3d714fb7-a389-4748-a781-2f9329fbc280'
-PORT = 8080
-serve_key = 'aqwersdf'
-ssh_startup = 'TERM=xterm-256color tmux new-session -t default || TERM=xterm-256color tmux new-session -s default'
-packages = ['git-core', 'tmux', 'zsh', 'curl', 'w3m', 'autojump', 'vim', 'wget', 'python-dev', 'htop']
-pip_packages = ['supervisor', 'fabric', 'virtualenv']
-pm_args = {'apt-get': '-ym --force-yes', 'yum': '-y'}
-aliases = {'!': 'sudo', 'pipi': 'sudo pip install', 'p': "sudo python ~/p.py"}
+remote_folder = '.'
 
 cloud_files = [  # Must be public
     {'key': 'vimrc', 'path': '~/.vimrc', 'bucket': 'averrin'},
@@ -96,30 +127,6 @@ elif os.path.basename(sys.argv[0]) == 'ipython':
 else:
     home_folder = os.path.split(os.path.abspath(sys.argv[0]))[0] + '/'
 
-remote_folder = '.'
-central_server = '-i .temp/aws_ssh_averrin averrin@aws.averr.in'  # TODO: split to vars
-
-servers_url = 'http://averrin.meteor.com/collectionapi/%s'
-
-new_server = {
-        "description": "",
-        "tags": [],
-        "ssh_port": 22,
-        "ip": "",
-        "host": "",
-        "groups": ["ssh"],
-        "projects": [],
-        "ftp_port": 21,
-        "other_hosts": [],
-        "ssh_user": "averrin",
-        "ssh_password": "",
-        "ssh_cert": "",
-        "os": "linux"
-    }
-
-# TODO: evernote tasks
-evernote_key = 'averrin'
-evernote_secret = '73dda0e225316788'
 
 # ENDCONFIG
 
@@ -185,13 +192,7 @@ class ServerList(dict):
                 self.update(json.loads(f.read()))
         else:
             info('No local servers.json')
-            # execute(update_json, hosts=[central_server])
-            # update_json()
             action('Servers getting from remote server')
-            # os.system('scp %s:servers.json %s' % (central_server, home_folder))
-            req = urllib2.Request(servers_url % 'SERVERS')
-            req.add_header('X-Auth-Token', api_token)
-            sc = urllib2.urlopen(req).read()
             if USE_LOCAL:
                 with file(os.path.join(home_folder, 'servers.json'), 'w') as f:
                     f.write(sc)
@@ -199,15 +200,12 @@ class ServerList(dict):
                 self.load()
             else:
                 ss = {}
-                for s in json.loads(sc):
+                for s in get_servers():
                     ss[s['alias']] = s
                 self.update(ss)
 
     def load_certs(self):
-        req = urllib2.Request(servers_url % 'KEYS')
-        req.add_header('X-Auth-Token', api_token)
-        sc = urllib2.urlopen(req).read()
-        return json.loads(sc)
+        return get_keys()
 
 
 # ETC
@@ -283,18 +281,23 @@ def shell(native=False, tmux=True):
     """
     if native or eval(str(native)):
         action('Opening native fabric shell')
-        open_shell(ssh_startup if eval(str(tmux)) else '')
+        open_shell(config['ssh_startup'] if eval(str(tmux)) else '')
     else:
         action('Opening ssh shell')
         key = current()['ssh_cert']
         password = SERVERS.by_attr('ip', env['host_string'].split('@')[1].split(':')[0])[0]['ssh_password']
         if key:
             key = '-i ' + os.path.join(home_folder, '.temp/', key)
-        ssh = "sshpass -p '%s' ssh %s -p %s %s %s" % (password,
+        # ssh = "sshpass -p '%s' ssh %s -p %s %s %s" % (password,
+        ssh = "ssh %s -p %s %s %s" % (
             env['host_string'].split(':')[0],
             env['host_string'].split(':')[1],
             key,
-            "-t '%s'" % ssh_startup if eval(str(tmux)) else '')
+            "-t '%s'" % config['ssh_startup'] if eval(str(tmux)) else '')
+        if platform.system() == 'Linux':
+            ssh = "sshpass -p '%s' %s" % (password, ssh)
+        else:
+            print password
         os.system(ssh)
         print ssh
     clean()
@@ -337,9 +340,9 @@ def init(full=False):
     env.warn_only = True
     if eval(str(full)):
         action('Perfom full init')
-        for p in packages:
+        for p in config['packages']:
             install(p)
-        for p in pip_packages:
+        for p in config['pip_packages']:
             pip(p)
         run('curl -L https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh | sh')
     env.warn_only = False
@@ -348,7 +351,7 @@ def init(full=False):
     put(dump_to_file('.tmux.conf', get_s3_var('tmux.conf').replace('{{shell}}', path)), '.')
     put(dump_to_file('.zshrc', Template(
         get_s3_var('zshrc')).render({'s': s,
-            'aliases': aliases})), '.')
+            'aliases': []})), '.')
     for cf in cloud_files:
         run('wget "https://s3.amazonaws.com/%(bucket)s/%(key)s" -O %(path)s' % cf)
     run('git config --global user.email "averrin@gmail.com"')
@@ -567,7 +570,6 @@ def check_project(project_name):
         error('Check failed=(')
 
 
-
 @task
 def list(ping=False):
     pings = []
@@ -599,6 +601,30 @@ def list(ping=False):
             print s['addr'].as_utf8
 
 
+@task
+def print_config():
+    print config
+
+
+@task
+def print_profile(name="a"):
+    print get_profile(name)
+
+
+@task
+def print_project(project):
+    for p in get_projects():
+        if p['title'] == project:
+            print p
+
+
+@task
+def todo(name="a"):
+    profile = get_profile(name)
+    print
+    print ' *  TODO:'
+    for t in profile['todo']:
+        action(t)
 
 if __name__ == "__main__":
     os.system('ipython --quick -c "import nervarin as n" -i')
