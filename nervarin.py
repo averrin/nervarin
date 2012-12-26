@@ -22,6 +22,7 @@ try:
     # from fabric.colors import red, green, cyan, yellow
     from fabulous.color import *
     from fabric.decorators import task
+    import re
     import os
     import sys
     import shutil
@@ -31,13 +32,20 @@ try:
     from jinja2 import Template
     import imp
     import urllib2
+    import urllib
     from subprocess import *
     import platform
+    from mongate.collection import Collection
+    from mongate.connection import Connection
 
 except ImportError:
     print 'Plz install deps:'
     print '>\tsudo pip install fabric bottle boto jinja2 fabulous'
     exit(1)
+
+
+show_actions = False
+show_info = False
 
 
 def success(msg):
@@ -46,8 +54,9 @@ def success(msg):
 
 
 def action(msg):
-    s = cyan(u' >  ' + msg)
-    print s.as_utf8
+    if show_actions:
+        s = cyan(u' >  ' + msg)
+        print s.as_utf8
 
 
 def error(msg):
@@ -56,15 +65,26 @@ def error(msg):
 
 
 def info(msg):
-    s = fg256('#eeee00', bold(u' !  ' + msg))
-    print s.as_utf8
+    if show_info:
+        s = fg256('#eeee00', bold(u' !  ' + msg))
+        print s.as_utf8
 
 # CONFIG
-SERVER = 'http://averrin.meteor.com'
-# SERVER = 'http://averr.in:3002'
-API_ROOT = 'collectionapi'
-API = '%s/%s/' % (SERVER, API_ROOT)
-TOKEN = '3d714fb7-a389-4748-a781-2f9329fbc280'
+# SERVER = 'http://averrin.meteor.com'
+ORLANGUR_SERVER = 'en.averr.in'
+ORLANGUR_PORT = 27080
+ORLANGUR_USER = 'averrin'
+ORLANGUR_PASWD = 'aqwersdf'
+# API_ROOT = 'collectionapi'
+# API = '%s/%s/' % (SERVER, API_ROOT)
+# TOKEN = '3d714fb7-a389-4748-a781-2f9329fbc280'
+url = 'http://%s:%s/orlangur/_authenticate' % (ORLANGUR_SERVER, ORLANGUR_PORT)
+data = {'username': ORLANGUR_USER, 'password': ORLANGUR_PASWD}
+req = urllib2.Request(url, urllib.urlencode(data))
+urllib2.urlopen(req).read()
+connection = Connection(ORLANGUR_SERVER, ORLANGUR_PORT)
+# connection.connect_to_mongo(host=MONGO_HOST, port=MONGO_PORT)
+db = connection.orlangur
 
 
 def make_request(collection):
@@ -74,17 +94,16 @@ def make_request(collection):
     req.add_header('X-Auth-Token', TOKEN)
     return urllib2.urlopen(req)
 
-get_projects = lambda: json.load(make_request('PROJECTS'))
-get_servers = lambda: json.load(make_request('SERVERS'))
-get_keys = lambda: json.load(make_request('KEYS'))
-get_users = lambda: json.load(make_request('PROFILES'))
-get_configs = lambda: json.load(make_request('CONFIGS'))
-get_clients = lambda: json.load(make_request('CLIENTS'))
+get_projects = lambda: db.en_projects.find()
+get_servers = lambda: db.en_servers.find()
+get_keys = lambda: db.en_keys.find()
+get_users = lambda: db.users.find()
+get_configs = lambda: db.en_configs.find()
+get_clients = lambda: db.en_clients.find()
 
 
 def get_profile(username):
     users = get_users()
-    # print users
     for user in users:
         if user['username'] == username:
             return user['profile']
@@ -92,7 +111,6 @@ def get_profile(username):
 
 def get_config(title="Nervarin"):
     clients = get_clients()
-    # print users
     for client in clients:
         if client['title'] == title:
             return client
@@ -622,9 +640,16 @@ def print_project(project):
 def todo(name="a"):
     profile = get_profile(name)
     print
-    print ' *  TODO:'
     for t in profile['todo']:
-        action(t)
+        marker = bold(blue(' * '))
+        if t.endswith('<b>??</b>'):
+            marker = bold(fg256('#555', ' ? '))
+        elif t.startswith('<b>'):
+            marker = bold(fg256('orange', ' * '))
+        t = re.sub(r'<b>([^<]+)</b>', lambda x: str(bold(x.group(1))), t)
+        t = re.sub(r'<s>([^<]+)</s>', lambda x: str(fg256('#444', x.group(1))), t)
+        t = re.sub(r"<\w+ style='color:([\w\# ]+)'>([^<]+)</\w+>", lambda x: str(fg256(x.group(1), x.group(2))), t)
+        print marker, t
 
 if __name__ == "__main__":
     os.system('ipython --quick -c "import nervarin as n" -i')
